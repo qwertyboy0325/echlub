@@ -91,6 +91,12 @@ No API-backed models or automatic premium fallback is authorized.
 
 ## Current status
 
-This repository configuration does **not** claim that Multitask or Grok routing has already passed.
+| Capability | Status |
+| --- | --- |
+| Multitask parallel execution | **Verified** — three custom subagents dispatched before await; concurrency proven |
+| Custom-agent discovery | **Verified** — `echlub-grok-smoke-auditor`, cargo/package smoke readers discovered and invoked |
+| Grok runtime model routing | **Unverified** — requested `cursor-grok-4.5-high-fast`; actual runtime model not recorded in verifiable metadata |
 
-Run the probe only after setup commit, reload, and a fresh chat using `.cursor/skills/echlub-multitask-smoke-probe/SKILL.md`.
+Probe verdict: `FAIL` with `MODEL_IDENTITY_UNVERIFIABLE`. See `docs/quality/multitask-smoke-probe.md`.
+
+Agent frontmatter `model:` remains requested-model only. Do not treat probe PASS for Grok routing until `model_identity_verifiable: true` and `actual_model = cursor-grok-4.5-high-fast` are recorded from runtime or execution metadata.

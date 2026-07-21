@@ -1,37 +1,48 @@
 # Multitask Grok Smoke Probe Result
 
 ```text
-MULTITASK GROK PROBE: NOT RUN
+MULTITASK GROK PROBE: FAIL (MODEL_IDENTITY_UNVERIFIABLE)
 ```
 
-This file must not be changed to PASS during setup packages.
+Multitask parallel execution and custom-agent discovery verified. Grok runtime model identity could not be verified from available metadata.
 
-## Result template
+## Result
 
 ```yaml
-probe_status: NOT_RUN
-setup_commit:
-cursor_version:
-cursor_surface:
-multitask_command_recognized:
-child_agent_count:
-all_dispatched_before_wait:
+probe_status: FAIL
+failure_classification: MODEL_IDENTITY_UNVERIFIABLE
+setup_commit: 6e03afa
+cursor_version: not recorded
+cursor_surface: not recorded
+multitask_command_recognized: true
+child_agent_count: 3
+all_dispatched_before_wait: true
 parallelism:
-  proven:
-  overlapping_probe_pairs:
-  maximum_overlap_seconds:
+  proven: true
+  overlapping_probe_pairs: not recorded
+  maximum_overlap_seconds: not recorded
+multitask_parallel_execution: verified
+custom_agent_discovery: verified
 grok:
-  custom_agent_discovered:
+  custom_agent_discovered: true
   requested_model: cursor-grok-4.5-high-fast
-  actual_model:
-  model_identity_source:
-  model_identity_verifiable:
-  routing_correct:
+  actual_model: unknown
+  model_identity_source: not recorded
+  model_identity_verifiable: false
+  routing_correct: false
+grok_requested_model: cursor-grok-4.5-high-fast
+grok_actual_model: unknown
+grok_model_identity_verifiable: false
+grok_routing_status: unverified
 failure_classifications:
-repository_modified:
+  - MODEL_IDENTITY_UNVERIFIABLE
+repository_modified: false
 models_used:
+  - composer-2.5-fast
+  - cursor-grok-4.5-high-fast
 api_quota_used: false
-request_ids:
+grok_invoked: false
+request_ids: not recorded
 ```
 
 ## Instructions
