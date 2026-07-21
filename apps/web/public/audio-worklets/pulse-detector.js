@@ -1,31 +1,25 @@
 class PulseDetectorProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.threshold = 0.02;
-    this.lastDetection = 0;
-    this.cooldownSamples = 1102;
-    this.pulseIndex = 0;
+    this.lastPeakAt = 0;
+    this.targetFreq = 1000;
+    this.sampleRate = sampleRate;
   }
 
   process(inputs) {
-    const input = inputs[0];
-    if (!input || !input[0]) return true;
+    const input = inputs[0]?.[0];
+    if (!input) return true;
 
-    const channel = input[0];
     let peak = 0;
-    for (let i = 0; i < channel.length; i++) {
-      const abs = Math.abs(channel[i]);
-      if (abs > peak) peak = abs;
+    for (let i = 0; i < input.length; i++) {
+      peak = Math.max(peak, Math.abs(input[i]));
     }
 
-    if (peak > this.threshold && currentFrame - this.lastDetection > this.cooldownSamples) {
-      this.lastDetection = currentFrame;
-      this.port.postMessage({
-        type: "pulse_detected",
-        pulseIndex: this.pulseIndex++,
-      });
+    const now = currentTime * 1000;
+    if (peak > 0.015 && now - this.lastPeakAt > 0.08) {
+      this.lastPeakAt = now;
+      this.port.postMessage({ type: "peak", peak, atMs: now, frequencyHz: this.targetFreq });
     }
-
     return true;
   }
 }

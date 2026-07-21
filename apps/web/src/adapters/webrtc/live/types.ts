@@ -34,6 +34,7 @@ export interface MetricValue {
 
 export interface ClockProbeSample {
   sequence: number;
+  senderRole: PeerRole;
   protocolVersion: number;
   t0: number;
   t1: number | null;
@@ -43,6 +44,8 @@ export interface ClockProbeSample {
   offsetMs: number | null;
   timeout: boolean;
   duplicate: boolean;
+  unsolicited: boolean;
+  invalid: boolean;
 }
 
 export interface LiveSessionConfig {
@@ -98,6 +101,13 @@ export function unsupported(): MetricValue {
 export function unavailable(reason: string): MetricValue {
   return { kind: "unavailable", reason };
 }
+
+export function invalid(reason: string): MetricValue {
+  return { kind: "invalid", reason };
+}
+
+export const CANDIDATE_CATEGORIES = ["host", "srflx", "prflx", "relay"] as const;
+export type CandidateCategory = (typeof CANDIDATE_CATEGORIES)[number];
 
 export function captureConstraints(profile: CaptureProfile): MediaTrackConstraints {
   if (profile === "music_low_latency") {

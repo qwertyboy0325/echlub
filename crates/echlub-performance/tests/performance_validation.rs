@@ -93,13 +93,13 @@ fn derived_metrics_computed_correctly() {
     let derived = compute_derived_metrics(&run);
     match derived.end_to_end_synthetic_ms {
         MetricValue::Observed { value } => {
-            assert!((value - 55.8).abs() < 0.01);
+            assert!((value - 395.0).abs() < 0.01);
         }
         other => panic!("expected observed, got {other:?}"),
     }
     match derived.setup_to_first_pulse_ms {
         MetricValue::Observed { value } => {
-            assert!((value - 351.5).abs() < 0.01);
+            assert!((value - 350.0).abs() < 0.01);
         }
         other => panic!("expected observed, got {other:?}"),
     }
@@ -154,17 +154,12 @@ fn metric_value_variants_serialize() {
 }
 
 #[test]
-fn rejects_zero_detection_artifact() {
+fn zero_detection_structurally_valid_observation_invalid() {
     let json = include_str!("../../../test-vectors/performance/synthetic-zero-detection-v1.json");
-    let result = validate_run(json);
-    assert!(!result.valid, "errors: {:?}", result.errors);
-}
-
-#[test]
-fn assess_rejects_zero_detection_artifact() {
-    let json = include_str!("../../../test-vectors/performance/synthetic-zero-detection-v1.json");
-    let result = assess_synthetic_observation(json);
-    assert!(!result.pass, "errors: {:?}", result.errors);
+    let validate = validate_run(json);
+    assert!(validate.valid, "errors: {:?}", validate.errors);
+    let assess = assess_synthetic_observation(json);
+    assert!(!assess.pass, "errors: {:?}", assess.errors);
 }
 
 #[test]

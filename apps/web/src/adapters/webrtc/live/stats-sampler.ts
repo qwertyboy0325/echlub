@@ -10,10 +10,20 @@ export interface NormalizedStatsSample {
   intervalMetrics?: Record<string, MetricValue>;
 }
 
+const CANDIDATE_TYPE_MAP: Record<string, number> = {
+  host: 1,
+  srflx: 2,
+  prflx: 3,
+  relay: 4,
+};
+
 function metricFromReport(report: Record<string, unknown>, key: string): MetricValue {
   const val = report[key];
   if (typeof val === "number" && Number.isFinite(val)) {
     return observed(val);
+  }
+  if (typeof val === "boolean") {
+    return observed(val ? 1 : 0);
   }
   if (val === undefined) return unsupported();
   return unavailable("not exposed");
@@ -21,7 +31,17 @@ function metricFromReport(report: Record<string, unknown>, key: string): MetricV
 
 function sanitizeCandidateType(report: Record<string, unknown>): MetricValue {
   const t = report.candidateType;
-  if (typeof t === "string") return observed(1);
+  if (typeof t === "string" && t in CANDIDATE_TYPE_MAP) {
+    return observed(CANDIDATE_TYPE_MAP[t]!);
+  }
+  return unsupported();
+}
+
+function sanitizeCodecMime(report: Record<string, unknown>): MetricValue {
+  const mime = report.mimeType;
+  if (typeof mime === "string" && mime.startsWith("audio/")) {
+    return observed(1);
+  }
   return unsupported();
 }
 
@@ -97,7 +117,7 @@ export async function collectNormalizedStats(
     }
     if (report.type === "codec") {
       codec = {
-        mimeType: metricFromReport(report, "mimeType"),
+        mimeType: sanitizeCodecMime(report),
         clockRate: metricFromReport(report, "clockRate"),
         channels: metricFromReport(report, "channels"),
       };
@@ -158,6 +178,9 @@ export class StatsSampler {
   private prev: NormalizedStatsSample | null = null;
   private startMs = 0;
   private sampling = false;
+  private generation = 0;
+  private activeGeneration = 0;
+  private stopped = false;
 
   constructor(
     private readonly pc: RTCPeerConnection,
@@ -166,13 +189,20 @@ export class StatsSampler {
 
   start(intervalMs: number, maxSamples: number, durationMs: number): void {
     this.stop();
+    this.stopped = false;
+    this.generation += 1;
+    this.activeGeneration = this.generation;
+    const token = this.activeGeneration;
     this.samples = [];
     this.prev = null;
     this.startMs = performance.now();
+
     const tick = async () => {
+      if (this.stopped || token !== this.activeGeneration) return;
       if (this.sampling) return;
       this.sampling = true;
       try {
+        if (token !== this.activeGeneration || this.stopped) return;
         if (this.samples.length >= maxSamples) {
           this.stop();
           return;
@@ -183,6 +213,7 @@ export class StatsSampler {
           return;
         }
         const sample = await collectNormalizedStats(this.pc, offsetMs, this.prev);
+        if (token !== this.activeGeneration || this.stopped) return;
         this.prev = sample;
         this.samples.push(sample);
         this.onSample(sample);
@@ -195,6 +226,8 @@ export class StatsSampler {
   }
 
   stop(): void {
+    this.stopped = true;
+    this.activeGeneration += 1;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;

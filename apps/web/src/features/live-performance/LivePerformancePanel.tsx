@@ -8,6 +8,7 @@ import {
   type PeerRole,
 } from "../../adapters/webrtc/live/types";
 import { downloadJson } from "../../shared/performance/types";
+import { injectedSoftwareCommit } from "../../shared/build-commit";
 
 const PRIVACY_NOTICE =
   "Use headphones. Raw microphone audio is exchanged through WebRTC and is not stored by EchLub. " +
@@ -96,7 +97,7 @@ export function LivePerformancePanel() {
         localPeerId: role,
         signalingUrl,
         captureProfile,
-        softwareCommit: "83d9303",
+        softwareCommit: injectedSoftwareCommit(),
       },
       callbacks,
     );

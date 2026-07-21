@@ -29,5 +29,11 @@ jobs:
         run: python3 scripts/verify.py --skip-references
       - name: Performance tests
         run: corepack pnpm performance:test
-      - name: Live endpoint vector validation
-        run: cargo run -p echlub-performance-report -- validate-live-endpoint test-vectors/performance/live-endpoint-peer-a-v1.json
+      - name: Live draft endpoint vector validation
+        run: cargo run -p echlub-performance-report -- validate-live-draft test-vectors/performance/live-endpoint-peer-a-v1.json
+      - name: Synthetic zero-detection assess fail
+        run: |
+          if cargo run -p echlub-performance-report -- assess-synthetic test-vectors/performance/synthetic-zero-detection-v1.json; then
+            echo "expected assess failure"
+            exit 1
+          fi

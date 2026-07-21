@@ -72,11 +72,24 @@ async function runSyntheticHarness() {
     timeout: 15000,
   });
 
+  await page.evaluate((id) => {
+    window.__ECHLUB_RUN_ID__ = id;
+  }, RUN_ID);
+
   const result = await page.evaluate(async () => {
     const fn = window.__echlubSyntheticHarness;
     if (!fn) throw new Error("harness function unavailable");
     return fn();
   });
+
+  if (result.outcome === "harness_limitation") {
+    console.warn(`HARNESS_LIMITATION: ${result.limitationReason ?? "decoded media detection unavailable"}`);
+  }
+  if (result.outcome === "connection_failed") {
+    console.error("CONNECTION_FAILED: synthetic loopback did not connect");
+    await browser.close();
+    process.exit(1);
+  }
 
   await browser.close();
 

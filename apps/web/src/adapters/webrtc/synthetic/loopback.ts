@@ -4,15 +4,32 @@ import {
   unsupported,
   type PerformanceRunDraft,
 } from "../../../shared/performance/types";
+import {
+  correlatePulseSequence,
+  computeDetectionStats,
+  DEFAULT_PULSE_DETECTION_CONFIG,
+  dominantFrequencyHz,
+  bandEnergyNearFrequency,
+  type PulseDetectionRecord,
+  type PulseEmitRecord,
+} from "./pulse-detector";
+
+export type HarnessOutcome = "pass" | "harness_limitation" | "connection_failed";
 
 export interface SyntheticRunResult {
+  outcome: HarnessOutcome;
+  limitationReason?: string;
+  observationStartedAt: string;
+  observationCompletedAt: string;
+  runId: string;
   timing: {
     pulseEmitMs: number | null;
     pulseDetectMs: number | null;
     loopbackLatencyMs: number | null;
-    datachannelRttMs: number;
-    iceGatheringMs: number;
-    connectionSetupMs: number;
+    datachannelRttMs: number | null;
+    iceGatheringMs: number | null;
+    connectionSetupMs: number | null;
+    observationWindowMs: number | null;
   };
   syntheticPulse: {
     pulsesEmitted: number;
@@ -21,6 +38,13 @@ export interface SyntheticRunResult {
     meanDetectionLatencyMs: number | null;
     jitterMs: number | null;
     correlatedPairs: number;
+    pulseRecords: Array<{
+      index: number;
+      emitAtMs: number;
+      detectedAtMs: number | null;
+      latencyMs: number | null;
+      frequencyHz: number;
+    }>;
   };
   transport: {
     bytesSent: number;
@@ -28,6 +52,12 @@ export interface SyntheticRunResult {
     packetsLost: number;
   };
   mediaPathLive: boolean;
+  decodedPulseDetectorUsed: boolean;
+}
+
+export interface SyntheticLoopbackOptions {
+  runId?: string;
+  connectionTimeoutMs?: number;
 }
 
 const PULSE_COUNT = 5;
@@ -36,11 +66,17 @@ const PULSE_FREQ = 1000;
 const PULSE_DURATION_S = 0.1;
 const INBOUND_WAIT_MS = 5000;
 const ONTACK_WAIT_MS = 5000;
-const PEAK_THRESHOLD = 0.015;
-const PEAK_COOLDOWN_MS = 80;
+const CONNECTION_TIMEOUT_MS = 8000;
+const DETECTOR_WARMUP_MS = 300;
+const RTT_TIMEOUT_MS = 3000;
 
-export async function runSyntheticLoopback(): Promise<SyntheticRunResult> {
-  const setupStart = performance.now();
+export async function runSyntheticLoopback(
+  options: SyntheticLoopbackOptions = {},
+): Promise<SyntheticRunResult> {
+  const runId = options.runId ?? `synthetic-${Date.now()}`;
+  const connectionTimeoutMs = options.connectionTimeoutMs ?? CONNECTION_TIMEOUT_MS;
+  const observationStartedAt = new Date().toISOString();
+  const observationStartMs = performance.now();
 
   const ctx = new AudioContext();
   await ctx.resume();
@@ -56,36 +92,18 @@ export async function runSyntheticLoopback(): Promise<SyntheticRunResult> {
     if (e.candidate) void pcA.addIceCandidate(e.candidate);
   };
 
+  const setupStart = performance.now();
   const iceStart = performance.now();
+
   const stream = dest.stream;
   for (const track of stream.getTracks()) {
     pcA.addTrack(track, stream);
   }
 
   const remoteTrackReady = waitForRemoteTrack(pcB, ONTACK_WAIT_MS);
-
   const dcA = pcA.createDataChannel("probe");
-  let dcRtt = 0;
-  const dcReady = new Promise<void>((resolve) => {
-    dcA.onopen = () => {
-      const sent = performance.now();
-      dcA.send(JSON.stringify({ type: "ping", sentAt: sent }));
-    };
-    pcB.ondatachannel = (e) => {
-      e.channel.onmessage = (msg) => {
-        try {
-          const data = JSON.parse(msg.data as string) as { type: string; sentAt: number };
-          if (data.type === "ping") {
-            dcRtt = performance.now() - data.sentAt;
-            e.channel.send(JSON.stringify({ type: "pong", sentAt: data.sentAt }));
-          }
-        } catch {
-          /* ignore */
-        }
-      };
-    };
-    setTimeout(resolve, 100);
-  });
+
+  const dcRttPromise = waitForDataChannelRtt(dcA, pcB, RTT_TIMEOUT_MS);
 
   const offer = await pcA.createOffer();
   await pcA.setLocalDescription(offer);
@@ -94,49 +112,56 @@ export async function runSyntheticLoopback(): Promise<SyntheticRunResult> {
   await pcB.setLocalDescription(answer);
   await pcA.setRemoteDescription(answer);
 
-  await waitForConnection(pcA);
+  const connected = await waitForConnection(pcA, connectionTimeoutMs);
+  if (!connected) {
+    pcA.close();
+    pcB.close();
+    await ctx.close();
+    return buildFailureResult(
+      runId,
+      observationStartedAt,
+      new Date().toISOString(),
+      observationStartMs,
+      "connection_failed",
+      "peer connection did not reach connected state within timeout",
+    );
+  }
+
   const iceGatheringMs = performance.now() - iceStart;
   const connectionSetupMs = performance.now() - setupStart;
-  await dcReady;
+  const dcRtt = await dcRttPromise;
 
   let remoteStream = await remoteTrackReady;
   remoteStream ??= receiverAudioStream(pcB);
   await waitForInboundBytes(pcB, INBOUND_WAIT_MS);
 
-  const detections: { pulseIndex: number; detectedAtMs: number }[] = [];
+  const rawDetections: PulseDetectionRecord[] = [];
   let stopDetector = () => {};
   if (remoteStream) {
-    stopDetector = startPeakDetector(ctx, remoteStream, (detectedAtMs) => {
-      detections.push({ pulseIndex: detections.length, detectedAtMs });
+    stopDetector = startDecodedMediaDetector(ctx, remoteStream, PULSE_FREQ, (record) => {
+      rawDetections.push(record);
     });
-    await sleep(300);
+    await sleep(DETECTOR_WARMUP_MS);
   }
 
-  const pulseEmitTimes: { index: number; emitAtMs: number }[] = [];
+  const pulseEmitTimes: PulseEmitRecord[] = [];
   for (let i = 0; i < PULSE_COUNT; i++) {
-    const beforeBytes = await inboundBytes(pcB);
     const emitAtMs = performance.now();
-    pulseEmitTimes.push({ index: i, emitAtMs });
+    pulseEmitTimes.push({ index: i, emitAtMs, frequencyHz: PULSE_FREQ });
     emitPulse(ctx, dest, PULSE_FREQ, PULSE_DURATION_S);
-    const byteDetection = await waitForInboundByteIncrease(pcB, beforeBytes, 400);
-    if (byteDetection !== null && detections.every((d) => Math.abs(d.detectedAtMs - byteDetection) > 5)) {
-      detections.push({ pulseIndex: detections.length, detectedAtMs: byteDetection });
-    }
     await sleep(PULSE_INTERVAL_MS);
   }
 
   await sleep(500);
   stopDetector();
 
-  const correlated = correlatePulses(pulseEmitTimes, detections);
+  const correlated = correlatePulseSequence(pulseEmitTimes, rawDetections, {
+    ...DEFAULT_PULSE_DETECTION_CONFIG,
+    targetFrequencyHz: PULSE_FREQ,
+    pulseIntervalMs: PULSE_INTERVAL_MS,
+  });
+  const stats = computeDetectionStats(correlated);
   const pulsesDetected = correlated.length;
-  const latencies = correlated.map((c) => c.detectedAtMs - c.emitAtMs);
-  const meanLatency =
-    latencies.length > 0 ? latencies.reduce((a, b) => a + b, 0) / latencies.length : null;
-  const jitter =
-    latencies.length > 1 && meanLatency !== null
-      ? Math.sqrt(latencies.reduce((s, l) => s + (l - meanLatency) ** 2, 0) / latencies.length)
-      : null;
 
   const statsB = await pcB.getStats();
   let bytesSent = 0;
@@ -151,37 +176,75 @@ export async function runSyntheticLoopback(): Promise<SyntheticRunResult> {
   });
 
   const mediaPathLive = bytesReceived > 0 && remoteStream !== null;
+  const observationCompletedAt = new Date().toISOString();
+  const observationWindowMs = performance.now() - observationStartMs;
 
   pcA.close();
   pcB.close();
   await ctx.close();
 
+  let outcome: HarnessOutcome = "pass";
+  let limitationReason: string | undefined;
+  if (pulsesDetected === 0 && mediaPathLive) {
+    outcome = "harness_limitation";
+    limitationReason =
+      "headless Chromium delivers inbound RTP but decoded remote media is not exposed to WebAudio analysers";
+  } else if (pulsesDetected === 0) {
+    outcome = "harness_limitation";
+    limitationReason = "no decoded pulse detections; inbound media path may be inactive";
+  }
+
+  const relativeEmit = pulseEmitTimes[0]
+    ? pulseEmitTimes[0].emitAtMs - observationStartMs
+    : null;
+  const relativeDetect = correlated[0]
+    ? correlated[0].detectedAtMs - observationStartMs
+    : null;
+
   return {
+    outcome,
+    limitationReason,
+    observationStartedAt,
+    observationCompletedAt,
+    runId,
     timing: {
-      pulseEmitMs: pulseEmitTimes[0]?.emitAtMs ?? null,
-      pulseDetectMs: correlated[0]?.detectedAtMs ?? null,
-      loopbackLatencyMs: meanLatency,
+      pulseEmitMs: relativeEmit,
+      pulseDetectMs: relativeDetect,
+      loopbackLatencyMs: stats.meanLatencyMs,
       datachannelRttMs: dcRtt,
       iceGatheringMs,
       connectionSetupMs,
+      observationWindowMs,
     },
     syntheticPulse: {
       pulsesEmitted: PULSE_COUNT,
       pulsesDetected,
       detectionRate: pulsesDetected / PULSE_COUNT,
-      meanDetectionLatencyMs: meanLatency,
-      jitterMs: jitter,
+      meanDetectionLatencyMs: stats.meanLatencyMs,
+      jitterMs: stats.jitterMs,
       correlatedPairs: pulsesDetected,
+      pulseRecords: pulseEmitTimes.map((emit) => {
+        const pair = correlated.find((c) => c.index === emit.index);
+        return {
+          index: emit.index,
+          emitAtMs: emit.emitAtMs - observationStartMs,
+          detectedAtMs: pair ? pair.detectedAtMs - observationStartMs : null,
+          latencyMs: pair?.latencyMs ?? null,
+          frequencyHz: emit.frequencyHz,
+        };
+      }),
     },
     transport: { bytesSent, bytesReceived, packetsLost },
     mediaPathLive,
+    decodedPulseDetectorUsed: true,
   };
 }
 
-function startPeakDetector(
+function startDecodedMediaDetector(
   ctx: AudioContext,
   remoteStream: MediaStream,
-  onPeak: (detectedAtMs: number) => void,
+  targetFreq: number,
+  onDetection: (record: PulseDetectionRecord) => void,
 ): () => void {
   const source = ctx.createMediaStreamSource(remoteStream);
   const analyser = ctx.createAnalyser();
@@ -192,21 +255,38 @@ function startPeakDetector(
   analyser.connect(silent);
   silent.connect(ctx.destination);
 
-  const data = new Float32Array(analyser.fftSize);
+  const timeData = new Float32Array(analyser.fftSize);
+  const freqData = new Float32Array(analyser.frequencyBinCount);
   let lastPeakAt = 0;
   let running = true;
+  const config = { ...DEFAULT_PULSE_DETECTION_CONFIG, targetFrequencyHz: targetFreq };
 
   const timer = setInterval(() => {
     if (!running) return;
-    analyser.getFloatTimeDomainData(data);
+    analyser.getFloatTimeDomainData(timeData);
+    analyser.getFloatFrequencyData(freqData);
+
     let peak = 0;
-    for (let i = 0; i < data.length; i++) {
-      peak = Math.max(peak, Math.abs(data[i]!));
+    for (let i = 0; i < timeData.length; i++) {
+      peak = Math.max(peak, Math.abs(timeData[i]!));
     }
+
+    const bandEnergy = bandEnergyNearFrequency(
+      freqData,
+      ctx.sampleRate,
+      targetFreq,
+      config.frequencyToleranceHz,
+    );
+    const frequencyHz = dominantFrequencyHz(freqData, ctx.sampleRate);
     const now = performance.now();
-    if (peak > PEAK_THRESHOLD && now - lastPeakAt > PEAK_COOLDOWN_MS) {
+
+    if (
+      peak > config.peakThreshold &&
+      bandEnergy >= config.minBandEnergy &&
+      now - lastPeakAt > config.peakCooldownMs
+    ) {
       lastPeakAt = now;
-      onPeak(now);
+      onDetection({ detectedAtMs: now, bandEnergy, peakAmplitude: peak, frequencyHz });
     }
   }, 5);
 
@@ -216,43 +296,98 @@ function startPeakDetector(
   };
 }
 
+function waitForDataChannelRtt(
+  dcA: RTCDataChannel,
+  pcB: RTCPeerConnection,
+  timeoutMs: number,
+): Promise<number | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    const timer = setTimeout(() => finish(null), timeoutMs);
+
+    dcA.onopen = () => {
+      const sentAt = performance.now();
+      dcA.send(JSON.stringify({ type: "ping", sentAt }));
+    };
+
+    pcB.ondatachannel = (e) => {
+      e.channel.onmessage = (msg) => {
+        try {
+          const data = JSON.parse(msg.data as string) as { type: string; sentAt: number };
+          if (data.type === "ping") {
+            e.channel.send(JSON.stringify({ type: "pong", sentAt: data.sentAt }));
+          }
+        } catch {
+          /* ignore */
+        }
+      };
+    };
+
+    dcA.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data as string) as { type: string; sentAt: number };
+        if (data.type === "pong") {
+          clearTimeout(timer);
+          finish(performance.now() - data.sentAt);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+  });
+}
+
+function buildFailureResult(
+  runId: string,
+  observationStartedAt: string,
+  observationCompletedAt: string,
+  observationStartMs: number,
+  outcome: HarnessOutcome,
+  limitationReason: string,
+): SyntheticRunResult {
+  void observationStartMs;
+  return {
+    outcome,
+    limitationReason,
+    observationStartedAt,
+    observationCompletedAt,
+    runId,
+    timing: {
+      pulseEmitMs: null,
+      pulseDetectMs: null,
+      loopbackLatencyMs: null,
+      datachannelRttMs: null,
+      iceGatheringMs: null,
+      connectionSetupMs: null,
+      observationWindowMs: null,
+    },
+    syntheticPulse: {
+      pulsesEmitted: 0,
+      pulsesDetected: 0,
+      detectionRate: 0,
+      meanDetectionLatencyMs: null,
+      jitterMs: null,
+      correlatedPairs: 0,
+      pulseRecords: [],
+    },
+    transport: { bytesSent: 0, bytesReceived: 0, packetsLost: 0 },
+    mediaPathLive: false,
+    decodedPulseDetectorUsed: true,
+  };
+}
+
 function receiverAudioStream(pc: RTCPeerConnection): MediaStream | null {
   const tracks = pc
     .getReceivers()
     .map((receiver) => receiver.track)
     .filter((track): track is MediaStreamTrack => track?.kind === "audio");
   return tracks.length > 0 ? new MediaStream(tracks) : null;
-}
-
-function correlatePulses(
-  emits: { index: number; emitAtMs: number }[],
-  detections: { pulseIndex: number; detectedAtMs: number }[],
-): { index: number; emitAtMs: number; detectedAtMs: number }[] {
-  const sorted = [...detections].sort((a, b) => a.detectedAtMs - b.detectedAtMs);
-  const pairs: { index: number; emitAtMs: number; detectedAtMs: number }[] = [];
-  let detectionCursor = 0;
-
-  for (const emit of emits) {
-    while (
-      detectionCursor < sorted.length &&
-      sorted[detectionCursor]!.detectedAtMs < emit.emitAtMs
-    ) {
-      detectionCursor += 1;
-    }
-    const candidate = sorted[detectionCursor];
-    if (!candidate) break;
-    const latency = candidate.detectedAtMs - emit.emitAtMs;
-    if (latency >= 0 && latency <= PULSE_INTERVAL_MS * 2) {
-      pairs.push({
-        index: emit.index,
-        emitAtMs: emit.emitAtMs,
-        detectedAtMs: candidate.detectedAtMs,
-      });
-      detectionCursor += 1;
-    }
-  }
-
-  return pairs;
 }
 
 function waitForRemoteTrack(pc: RTCPeerConnection, timeoutMs: number): Promise<MediaStream | null> {
@@ -289,21 +424,12 @@ async function inboundBytes(pc: RTCPeerConnection): Promise<number> {
   return received;
 }
 
-async function waitForInboundByteIncrease(
-  pc: RTCPeerConnection,
-  beforeBytes: number,
-  timeoutMs: number,
-): Promise<number | null> {
-  const deadline = performance.now() + timeoutMs;
-  while (performance.now() < deadline) {
-    const after = await inboundBytes(pc);
-    if (after > beforeBytes) return performance.now();
-    await sleep(5);
-  }
-  return null;
-}
-
-function emitPulse(ctx: AudioContext, dest: MediaStreamAudioDestinationNode, freq: number, duration: number): void {
+function emitPulse(
+  ctx: AudioContext,
+  dest: MediaStreamAudioDestinationNode,
+  freq: number,
+  duration: number,
+): void {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.frequency.value = freq;
@@ -315,20 +441,25 @@ function emitPulse(ctx: AudioContext, dest: MediaStreamAudioDestinationNode, fre
   osc.stop(now + duration);
 }
 
-function waitForConnection(pc: RTCPeerConnection): Promise<void> {
+function waitForConnection(pc: RTCPeerConnection, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
     if (pc.connectionState === "connected") {
-      resolve();
+      resolve(true);
       return;
     }
+    const timer = setTimeout(() => resolve(pc.connectionState === "connected"), timeoutMs);
     const check = () => {
-      if (pc.connectionState === "connected" || pc.connectionState === "failed") {
+      if (pc.connectionState === "connected") {
+        clearTimeout(timer);
         pc.removeEventListener("connectionstatechange", check);
-        resolve();
+        resolve(true);
+      } else if (pc.connectionState === "failed") {
+        clearTimeout(timer);
+        pc.removeEventListener("connectionstatechange", check);
+        resolve(false);
       }
     };
     pc.addEventListener("connectionstatechange", check);
-    setTimeout(resolve, 3000);
   });
 }
 
@@ -337,31 +468,49 @@ function sleep(ms: number): Promise<void> {
 }
 
 export function buildPerformanceRunDraft(result: SyntheticRunResult): PerformanceRunDraft {
-  const pathOk = result.mediaPathLive && result.syntheticPulse.pulsesDetected > 0;
+  const pathOk =
+    result.outcome === "pass" &&
+    result.mediaPathLive &&
+    result.syntheticPulse.pulsesDetected >= 4;
+
+  const harnessLimitation =
+    result.outcome === "harness_limitation"
+      ? result.limitationReason ?? "decoded media detection unavailable"
+      : null;
 
   return {
     schemaVersion: "PerformanceRunV1",
     evidenceLevel: "browser_synthetic_media_path",
     evidenceStatus: "exploratory_non_authoritative",
     metadata: {
-      runId: `synthetic-${Date.now()}`,
-      startedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-      harnessVersion: "0.2.0",
+      runId: result.runId,
+      startedAt: result.observationStartedAt,
+      completedAt: result.observationCompletedAt,
+      harnessVersion: "0.3.0",
       browserFamily: detectBrowserFamily(),
       platform: navigator.platform ?? null,
+      ...(harnessLimitation ? { harnessLimitation } : {}),
     },
     timing: {
       pulseEmitMs: metricOrUnavailable(result.timing.pulseEmitMs, "no pulse emit timing"),
       pulseDetectMs: pathOk
         ? metricOrUnavailable(result.timing.pulseDetectMs, "no pulse detection timing")
-        : unavailable("inbound media path did not deliver detectable pulses"),
+        : unavailable(harnessLimitation ?? "inbound media path did not deliver detectable pulses"),
       loopbackLatencyMs: pathOk
         ? metricOrUnavailable(result.timing.loopbackLatencyMs, "no correlated loopback latency")
-        : unavailable("no pulse detections for loopback latency"),
-      datachannelRttMs: observed(result.timing.datachannelRttMs),
-      iceGatheringMs: observed(result.timing.iceGatheringMs),
-      connectionSetupMs: observed(result.timing.connectionSetupMs),
+        : unavailable(harnessLimitation ?? "no pulse detections for loopback latency"),
+      datachannelRttMs: result.timing.datachannelRttMs !== null
+        ? observed(result.timing.datachannelRttMs)
+        : unavailable("ping/pong RTT not completed"),
+      iceGatheringMs: result.timing.iceGatheringMs !== null
+        ? observed(result.timing.iceGatheringMs)
+        : unavailable("ICE gathering timing unavailable"),
+      connectionSetupMs: result.timing.connectionSetupMs !== null
+        ? observed(result.timing.connectionSetupMs)
+        : unavailable("connection setup timing unavailable"),
+      observationWindowMs: result.timing.observationWindowMs !== null
+        ? observed(result.timing.observationWindowMs)
+        : unavailable("observation window unavailable"),
     },
     syntheticPulse: {
       pulsesEmitted: observed(result.syntheticPulse.pulsesEmitted),
@@ -369,10 +518,10 @@ export function buildPerformanceRunDraft(result: SyntheticRunResult): Performanc
       detectionRate: observed(result.syntheticPulse.detectionRate),
       meanDetectionLatencyMs: pathOk
         ? metricOrUnavailable(result.syntheticPulse.meanDetectionLatencyMs, "no detection latency samples")
-        : unavailable("no pulse detections"),
+        : unavailable(harnessLimitation ?? "no pulse detections"),
       jitterMs: pathOk
         ? metricOrUnavailable(result.syntheticPulse.jitterMs, "insufficient samples for jitter")
-        : unavailable("no pulse detections"),
+        : unavailable(harnessLimitation ?? "no pulse detections"),
     },
     transport: {
       candidatePairType: unsupported(),
@@ -394,3 +543,11 @@ function detectBrowserFamily(): string | null {
   if (ua.includes("Safari")) return "safari";
   return null;
 }
+
+export {
+  correlatePulseSequence,
+  classifyDetection,
+  rejectBackgroundRtpWithoutPulse,
+  bandEnergyNearFrequency,
+  DEFAULT_PULSE_DETECTION_CONFIG,
+} from "./pulse-detector";

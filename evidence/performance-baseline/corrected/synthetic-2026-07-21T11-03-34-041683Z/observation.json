@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "PerformanceRunV1",
+  "evidenceLevel": "browser_synthetic_media_path",
+  "evidenceStatus": "exploratory_non_authoritative",
+  "metadata": {
+    "runId": "synthetic-2026-07-21T11-03-34-041683Z",
+    "startedAt": "2026-07-21T11:03:39.507Z",
+    "completedAt": "2026-07-21T11:03:46.718Z",
+    "harnessVersion": "0.3.0",
+    "browserFamily": "chromium",
+    "platform": "MacIntel",
+    "harnessLimitation": "headless Chromium delivers inbound RTP but decoded remote media is not exposed to WebAudio analysers"
+  },
+  "timing": {
+    "pulseEmitMs": {
+      "kind": "observed",
+      "value": 5685.799999952316
+    },
+    "pulseDetectMs": {
+      "kind": "unavailable",
+      "reason": "headless Chromium delivers inbound RTP but decoded remote media is not exposed to WebAudio analysers"
+    },
+    "loopbackLatencyMs": {
+      "kind": "unavailable",
+      "reason": "headless Chromium delivers inbound RTP but decoded remote media is not exposed to WebAudio analysers"
+    },
+    "datachannelRttMs": {
+      "kind": "observed",
+      "value": 0.5
+    },
+    "iceGatheringMs": {
+      "kind": "observed",
+      "value": 59
+    },
+    "connectionSetupMs": {
+      "kind": "observed",
+      "value": 59
+    },
+    "observationWindowMs": {
+      "kind": "observed",
+      "value": 7210.599999964237
+    }
+  },
+  "syntheticPulse": {
+    "pulsesEmitted": {
+      "kind": "observed",
+      "value": 5
+    },
+    "pulsesDetected": {
+      "kind": "observed",
+      "value": 0
+    },
+    "detectionRate": {
+      "kind": "observed",
+      "value": 0
+    },
+    "meanDetectionLatencyMs": {
+      "kind": "unavailable",
+      "reason": "headless Chromium delivers inbound RTP but decoded remote media is not exposed to WebAudio analysers"
+    },
+    "jitterMs": {
+      "kind": "unavailable",
+      "reason": "headless Chromium delivers inbound RTP but decoded remote media is not exposed to WebAudio analysers"
+    }
+  },
+  "transport": {
+    "candidatePairType": {
+      "kind": "unsupported"
+    },
+    "bytesSent": {
+      "kind": "observed",
+      "value": 0
+    },
+    "bytesReceived": {
+      "kind": "observed",
+      "value": 1999
+    },
+    "packetsLost": {
+      "kind": "observed",
+      "value": 0
+    }
+  },
+  "outcome": "harness_limitation",
+  "limitationReason": "headless Chromium delivers inbound RTP but decoded remote media is not exposed to WebAudio analysers",
+  "pulseRecords": [
+    {
+      "index": 0,
+      "emitAtMs": 5685.799999952316,
+      "detectedAtMs": null,
+      "latencyMs": null,
+      "frequencyHz": 1000
+    },
+    {
+      "index": 1,
+      "emitAtMs": 5889.699999988079,
+      "detectedAtMs": null,
+      "latencyMs": null,
+      "frequencyHz": 1000
+    },
+    {
+      "index": 2,
+      "emitAtMs": 6094.299999952316,
+      "detectedAtMs": null,
+      "latencyMs": null,
+      "frequencyHz": 1000
+    },
+    {
+      "index": 3,
+      "emitAtMs": 6299.899999976158,
+      "detectedAtMs": null,
+      "latencyMs": null,
+      "frequencyHz": 1000
+    },
+    {
+      "index": 4,
+      "emitAtMs": 6504.899999976158,
+      "detectedAtMs": null,
+      "latencyMs": null,
+      "frequencyHz": 1000
+    }
+  ],
+  "decodedPulseDetectorUsed": true
+}

@@ -92,7 +92,7 @@ def main() -> int:
                 ],
             ),
             (
-                "performance zero-detection negative fixture",
+                "performance zero-detection structural fixture",
                 [
                     "cargo",
                     "run",
@@ -104,14 +104,26 @@ def main() -> int:
                 ],
             ),
             (
-                "live endpoint test vector",
+                "performance zero-detection assess fail",
                 [
                     "cargo",
                     "run",
                     "-p",
                     "echlub-performance-report",
                     "--",
-                    "validate-live-endpoint",
+                    "assess-synthetic",
+                    "test-vectors/performance/synthetic-zero-detection-v1.json",
+                ],
+            ),
+            (
+                "live endpoint draft vector",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-draft",
                     "test-vectors/performance/live-endpoint-peer-a-v1.json",
                 ],
             ),
@@ -123,7 +135,7 @@ def main() -> int:
 
     failed = []
     for label, cmd in steps:
-        if label == "performance zero-detection negative fixture":
+        if label == "performance zero-detection assess fail":
             ok = run_expect_fail(label, cmd)
         else:
             ok = run(label, cmd)

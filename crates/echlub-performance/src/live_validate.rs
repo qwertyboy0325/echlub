@@ -147,6 +147,14 @@ pub fn validate_live_endpoint(json: &str, require_finalized: bool) -> LiveValida
     }
 }
 
+fn validate_software_commit(value: &Value, errors: &mut Vec<LiveValidationError>) {
+    let commit = value.get("softwareCommit").and_then(|v| v.as_str());
+    match commit {
+        Some(c) if c.len() >= 7 && c != "unknown" && !c.contains("placeholder") => {}
+        _ => errors.push(LiveValidationError::MissingField("softwareCommit".into())),
+    }
+}
+
 fn is_valid_correlation_id(corr: Option<&str>) -> bool {
     match corr {
         Some(id) if id.len() == 32 => id.chars().all(|c| c.is_ascii_hexdigit()),
@@ -155,6 +163,7 @@ fn is_valid_correlation_id(corr: Option<&str>) -> bool {
 }
 
 fn validate_finalized_requirements(value: &Value, errors: &mut Vec<LiveValidationError>) {
+    validate_software_commit(value, errors);
     let stats_len = value
         .get("statsSamples")
         .or_else(|| value.get("stats_samples"))

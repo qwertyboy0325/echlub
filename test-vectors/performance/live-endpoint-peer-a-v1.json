@@ -7,7 +7,7 @@
   "peerRole": "peer_a",
   "startedAtUtc": "2026-07-21T09:00:00Z",
   "completedAtUtc": "2026-07-21T09:01:00Z",
-  "softwareCommit": "83d9303",
+  "softwareCommit": "e4198657264a6b4629948469dcdabde21a3eaa34",
   "environment": {
     "browserFamily": "chromium",
     "platform": "darwin",

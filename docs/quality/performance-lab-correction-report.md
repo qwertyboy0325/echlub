@@ -1,65 +1,75 @@
-# Performance Laboratory Correction Report
+# Performance Laboratory External Review Correction Report
 
-Package: ECHLUB-PERFORMANCE-LAB-REAUDIT-CORRECTION-01
+Package: ECHLUB-PERFORMANCE-LAB-EXTERNAL-REVIEW-CORRECTION-02
 
-## Verdict: PASS
+## Verdict: PARTIAL
 
-## B1 — Synthetic harness
+Stop gate: `SYNTHETIC_DECODED_MEDIA_LIMITATION` until decoded-pulse detection passes in harness; live corrections and validators land for owner re-review.
+
+## Owner external review findings mapped
+
+| Finding | Correction |
+| --- | --- |
+| RTP byte progression used as pulse detection | Removed; bytes only for `media_path_live` |
+| Headless synthetic PASS not defensible | `HARNESS_LIMITATION` when decoded media unavailable |
+| DataChannel RTT not ping/pong | A sends ping; B pong; A records RTT after pong |
+| Hard-coded software commit | Build-time git commit injection |
+| Ready gate UI-only | Enforced in `LiveWebRtcSession.startObservation()` |
+| Draft/finalized export mixed | Separate draft vs finalized export paths |
+| Bilateral clock probes incomplete | Both roles initiate; role namespaced sequences |
+| Derived metrics double-count loopback | `endToEndSyntheticMs = setup + loopback` |
+| Structural vs observation validity conflated | validate structural; assess-synthetic observation |
+| Runner optional success semantics | Fail-closed runner |
+| Corrected e419865 evidence overclaimed | Reclassified superseded (RTP bytes) |
+
+## C1 — Synthetic harness
 
 | Item | Status |
 | --- | --- |
-| Timing semantics unified on `performance.now()` | Done |
-| Pulse correlation (emit ↔ inbound-byte progression + analyser fallback) | Done |
-| Fresh artifact guarantee (`corrected/<run-id>/observation.json`) | Done |
-| Runner exit codes (0 pass, 1 assess/validate fail, 2 browser fail) | Done |
-| `assess-synthetic` vs `validate` separation | Done |
+| Decoded media pulse detector (frequency/envelope/sequence) | Done |
+| Inbound bytes path-liveness only | Done |
+| HARNESS_LIMITATION classification | Done |
+| Actual observation window timestamps | Done |
+| Consistent run ID | Done |
+| Ping/pong RTT | Done |
+| Independent detector tests | Done |
 
-Root cause: headless Chromium delivers inbound RTP (stats counters advance) but does not expose decoded samples to WebAudio analysers reliably. Detection uses correlated inbound-byte progression tied to pulse emit times.
+Root cause retained: headless Chromium may deliver inbound RTP without exposing decoded samples to analysers.
 
-## B2 — Live WebRTC
-
-| Item | Status |
-| --- | --- |
-| Mic attach on connect when stream pre-captured | Done |
-| Clock warmup probes at DataChannel open | Done |
-| Ready gate enforced in UI (`ready_to_observe` only) | Done |
-| Serialized stats sampling | Done |
-
-## B3 — Rust validators
+## C2 — Live WebRTC
 
 | Item | Status |
 | --- | --- |
-| `assess_synthetic_observation` | Done |
-| Zero-fill guard for failed-path `observed: 0` | Done |
-| Derived metrics unavailable without detections | Done |
-| CLI `assess-synthetic` command | Done |
-| Negative fixture `synthetic-zero-detection-v1.json` | Done |
+| Exact commit injection | Done |
+| Session ready gate in startObservation | Done |
+| Bilateral clock probes | Done |
+| Typed stats + candidate categories | Done |
+| Cancellable stats sampling | Done |
+| Behavioral tests | Done |
 
-## B4 — Control plane / CI / docs
+## C3 — Rust validators
 
 | Item | Status |
 | --- | --- |
-| Origin policy (existing strict validation) | Verified |
-| `verify.py` assess + negative fixture | Done |
-| Evidence manifest | Done |
-| Runbook suspended pending owner live run | Done |
+| Structural vs observation separation | Done |
+| Assessment thresholds (≥5 emit, ≥4 detect, ≥0.8 rate) | Done |
+| Corrected derived metrics | Done |
+| validate-live-endpoint finalized | Done |
+| validate-live-draft command | Done |
+| Zero-detection structural fixture | Done |
 
-## Phase D — Corrected synthetic run
+## C4 — Runner / CI / docs
 
-- Run ID: `synthetic-2026-07-21T10-01-14-749008Z`
-- Path: `evidence/performance-baseline/corrected/synthetic-2026-07-21T10-01-14-749008Z/`
-- validate: PASS
-- assess-synthetic: PASS
-- `pulsesDetected: 5`, `detectionRate: 1.0`, `bytesReceived: 1999`
+| Item | Status |
+| --- | --- |
+| Fail-closed runner | Done |
+| Superseded corrected evidence reclassification | Done |
+| Active evidence only on decoded pulse PASS | Done |
+| Live runbook suspended | Verified |
 
-## Phase E — Post-correction audit
+## Corrected synthetic gate
 
-Internal read-only audit: **PASS**
-
-- Negative fixture rejected by validate
-- Positive vector passes assess
-- Historical artifacts reclassified, not deleted
-- No live import artifacts populated
+Active corrected PASS requires decoded-pulse detection meeting assessment thresholds. Prior corrected run at e419865 head reclassified; historical JSON unchanged.
 
 ## Model accounting
 

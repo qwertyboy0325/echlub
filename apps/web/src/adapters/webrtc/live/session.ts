@@ -1,4 +1,4 @@
-import { ClockProbeEngine, computeClockMedian } from "./clock-probe";
+import { ClockProbeEngine, computeClockMedian, validCompletedProbes } from "./clock-probe";
 import {
   applySignalingDescription,
   createAndSendOffer,
@@ -140,6 +140,7 @@ export class LiveWebRtcSession {
 
   async startObservation(config: ObservationConfig = {}): Promise<void> {
     this.assertNotStopped();
+    this.assertReadyToObserve();
     const durationSeconds = Math.min(
       config.durationSeconds ?? DEFAULT_OBSERVATION_SECONDS,
       MAX_OBSERVATION_SECONDS,
@@ -181,7 +182,24 @@ export class LiveWebRtcSession {
   }
 
   exportEndpointDraft(): Record<string, unknown> {
+    return this.buildEndpointExport(false);
+  }
+
+  exportFinalizedEndpoint(): Record<string, unknown> {
+    if (this.phase !== "completed") {
+      throw new Error("export before observation completion rejected");
+    }
+    const commit = this.config.softwareCommit?.trim();
+    if (!commit || commit === "unknown" || commit.length < 7) {
+      throw new Error("exact software commit required for finalized export");
+    }
+    return this.buildEndpointExport(true);
+  }
+
+  private buildEndpointExport(finalized: boolean): Record<string, unknown> {
     const medians = computeClockMedian(this.clockSamples);
+    const remoteTrack = this.remoteStream?.getAudioTracks()[0] ?? null;
+    const commit = this.config.softwareCommit?.trim();
     return {
       schemaVersion: LIVE_SCHEMA_VERSION,
       evidenceLevel: "browser_network_observation",
@@ -189,9 +207,10 @@ export class LiveWebRtcSession {
       runId: `live-${this.config.sessionCorrelationId}-${this.config.localPeerId}`,
       sessionCorrelationId: this.config.sessionCorrelationId,
       peerRole: this.config.localPeerId,
-      startedAtUtc: this.observationStartedAt ?? new Date().toISOString(),
-      completedAtUtc: this.observationCompletedAt ?? new Date().toISOString(),
-      softwareCommit: this.config.softwareCommit ?? "unknown",
+      startedAtUtc: this.observationStartedAt,
+      completedAtUtc: this.observationCompletedAt,
+      softwareCommit: commit || null,
+      exportKind: finalized ? "finalized" : "diagnostic_draft",
       environment: {
         browserFamily: detectBrowserFamily(),
         platform: navigator.platform ?? null,
@@ -203,7 +222,8 @@ export class LiveWebRtcSession {
       playout: {
         path: "html_media_element",
         remoteAudioTrackReceived: this.remoteStream !== null,
-        remoteAudioTrackUnmuted: this.remoteStream?.getAudioTracks()[0]?.enabled ?? false,
+        remoteAudioTrackReadyState: remoteTrack?.readyState ?? unavailable("no remote track").reason,
+        remoteAudioTrackMuted: remoteTrack?.muted ?? unavailable("no remote track").reason,
         autoplayAttempted: true,
         ...this.playoutState,
       },
@@ -214,8 +234,10 @@ export class LiveWebRtcSession {
       },
       clockProbes: {
         samples: this.clockSamples,
+        completedProbes: validCompletedProbes(this.clockSamples).length,
         medianRttMs: medians.rtt,
         medianOffsetMs: medians.offset,
+        madRttMs: medians.madRtt,
         offsetLimitation:
           "Clock offset is an estimate affected by route asymmetry and scheduling; not synchronized truth.",
       },
@@ -313,7 +335,7 @@ export class LiveWebRtcSession {
     channel.onopen = () => {
       this.dataChannelProps.readyState = channel.readyState;
       this.callbacks.onDataChannelState(channel.readyState);
-      this.clockEngine = new ClockProbeEngine(this.config.localPeerId === "peer_a", (sample) => {
+      this.clockEngine = new ClockProbeEngine(this.config.localPeerId, (sample) => {
         this.clockSamples.push(sample);
         this.callbacks.onClockProbe(sample);
         this.evaluateReadyToObserve();
@@ -376,14 +398,49 @@ export class LiveWebRtcSession {
   }
 
   private evaluateReadyToObserve(): void {
-    const micReady = this.localStream !== null;
-    const connected = this.pc?.connectionState === "connected";
-    const remoteTrack = this.remoteStream !== null && this.remoteStream.getAudioTracks()[0]?.readyState !== "ended";
-    const dcOpen = this.dc?.readyState === "open";
-    const responsiveProbe = this.clockSamples.some((s) => !s.timeout && s.rttMs !== null);
-    if (micReady && connected && remoteTrack && dcOpen && responsiveProbe && this.phase !== "observing") {
-      this.setPhase("ready_to_observe");
+    try {
+      this.collectReadyFailures();
+      if (this.phase !== "observing" && this.phase !== "completed" && this.phase !== "finalizing") {
+        this.setPhase("ready_to_observe");
+      }
+    } catch {
+      /* not ready yet */
     }
+  }
+
+  private assertReadyToObserve(): void {
+    const failures = this.collectReadyFailures();
+    if (failures.length > 0) {
+      throw new Error(`not ready to observe: ${failures.join(", ")}`);
+    }
+  }
+
+  private collectReadyFailures(): string[] {
+    const failures: string[] = [];
+    const micTrack = this.localStream?.getAudioTracks()[0];
+    if (!micTrack || micTrack.readyState !== "live") failures.push("microphone track not live");
+    if (this.pc?.connectionState !== "connected") failures.push("peer connection not connected");
+    const ice = this.pc?.iceConnectionState;
+    if (ice !== "connected" && ice !== "completed") failures.push("ICE not connected");
+    if (this.pc?.signalingState !== "stable") failures.push("signaling not stable");
+    if (this.negotiation.makingOffer || this.negotiation.isSettingRemoteAnswerPending) {
+      failures.push("negotiation in progress");
+    }
+    const remoteTrack = this.remoteStream?.getAudioTracks()[0];
+    if (!remoteTrack || remoteTrack.readyState === "ended") {
+      failures.push("remote audio track missing or ended");
+    }
+    if (this.dc?.readyState !== "open") failures.push("data channel not open");
+    const completedProbes = validCompletedProbes(this.clockSamples);
+    if (completedProbes.length < 1) failures.push("clock preflight incomplete");
+    if (this.statsSamples.length < 1 && this.phase === "ready_to_observe") {
+      /* stats preflight runs during observation */
+    }
+    const commit = this.config.softwareCommit?.trim();
+    if (!commit || commit === "unknown" || commit.length < 7) {
+      failures.push("exact software commit missing");
+    }
+    return failures;
   }
 
   private setPhase(phase: LiveSessionPhase): void {

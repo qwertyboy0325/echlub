@@ -17,6 +17,7 @@ Commands:\n\
   summarize <file>\n\
   verify-directory <dir>\n\
   validate-live-endpoint <file>\n\
+  validate-live-draft <file>\n\
   summarize-live-endpoint <file> [--output <dir>]\n\
   pair-live-endpoints <peer-a.json> <peer-b.json> [--output <dir>]\n\
   verify-live-directory <dir>"
@@ -35,7 +36,8 @@ fn main() {
         "assess-synthetic" => assess_file(require_path(&args, 2)),
         "summarize" => summarize_file(require_path(&args, 2)),
         "verify-directory" => verify_directory(require_path(&args, 2)),
-        "validate-live-endpoint" => validate_live_file(require_path(&args, 2)),
+        "validate-live-endpoint" => validate_live_file(require_path(&args, 2), true),
+        "validate-live-draft" => validate_live_file(require_path(&args, 2), false),
         "summarize-live-endpoint" => {
             let path = require_path(&args, 2);
             let out = output_dir(&args, 3)
@@ -101,9 +103,9 @@ fn assess_file(path: &Path) {
     }
 }
 
-fn validate_live_file(path: &Path) {
+fn validate_live_file(path: &Path, require_finalized: bool) {
     let json = read_file(path);
-    let result = validate_live_endpoint(&json, false);
+    let result = validate_live_endpoint(&json, require_finalized);
     if result.valid {
         println!("VALID: {}", path.display());
     } else {
