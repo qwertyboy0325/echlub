@@ -1,3 +1,4 @@
+pub mod assess;
 pub mod derived;
 pub mod live_derived;
 pub mod live_pair;
@@ -9,6 +10,7 @@ pub mod schema;
 pub mod summarize;
 pub mod validate;
 
+pub use assess::{assess_run, assess_synthetic_observation, AssessmentError, AssessmentResult};
 pub use derived::compute_derived_metrics;
 pub use live_pair::{
     pair_live_endpoints, validate_live_directory, PairArtifacts, PairValidationError,

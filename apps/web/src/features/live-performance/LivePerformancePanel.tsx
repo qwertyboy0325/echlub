@@ -52,7 +52,7 @@ export function LivePerformancePanel() {
   const canPrepare = phase === "idle";
   const canEnableMic = headphonesAck && (phase === "prepared" || phase === "idle");
   const canConnect = phase === "microphone_ready";
-  const canObserve = phase === "ready_to_observe" || phase === "connected";
+  const canObserve = phase === "ready_to_observe";
   const canExport = phase === "completed";
   const canStop = phase !== "idle" && phase !== "stopped";
 

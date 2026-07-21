@@ -6,8 +6,13 @@ import puppeteer from "puppeteer-core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "../../..");
-const EVIDENCE_DIR = join(ROOT, "evidence/performance-baseline");
+const CORRECTED_DIR = join(ROOT, "evidence/performance-baseline/corrected");
 const WEB_URL = process.env.ECHLUB_WEB_URL ?? "http://localhost:4173";
+const RUN_ID =
+  process.env.ECHLUB_RUN_ID ??
+  new Date().toISOString().replace(/[:.]/g, "-").replace("T", "T").replace("Z", "Z");
+const ARTIFACT_PATH =
+  process.env.ECHLUB_ARTIFACT_PATH ?? join(CORRECTED_DIR, RUN_ID, "observation.json");
 
 function detectBrowserExecutable() {
   const candidates = [
@@ -52,6 +57,7 @@ async function runSyntheticHarness() {
     executablePath,
     headless: true,
     args: [
+      "--headless=new",
       "--use-fake-ui-for-media-stream",
       "--use-fake-device-for-media-stream",
       "--autoplay-policy=no-user-gesture-required",
@@ -74,12 +80,10 @@ async function runSyntheticHarness() {
 
   await browser.close();
 
-  mkdirSync(EVIDENCE_DIR, { recursive: true });
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const artifactPath = join(EVIDENCE_DIR, `synthetic-${timestamp}.json`);
-  writeFileSync(artifactPath, JSON.stringify(result, null, 2));
-  console.log(`Evidence written: ${artifactPath}`);
-  return artifactPath;
+  mkdirSync(dirname(ARTIFACT_PATH), { recursive: true });
+  writeFileSync(ARTIFACT_PATH, JSON.stringify(result, null, 2));
+  console.log(`Evidence written: ${ARTIFACT_PATH}`);
+  return ARTIFACT_PATH;
 }
 
 runSyntheticHarness().catch((err) => {

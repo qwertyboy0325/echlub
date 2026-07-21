@@ -97,6 +97,14 @@ export class LiveWebRtcSession {
     this.setPhase("signaling_connecting");
     this.pc = new RTCPeerConnection({ iceServers: [] });
     this.audioTransceiver = this.pc.addTransceiver("audio", { direction: "sendrecv" });
+
+    if (this.localStream) {
+      const track = this.localStream.getAudioTracks()[0];
+      if (track && this.audioTransceiver.sender) {
+        await this.audioTransceiver.sender.replaceTrack(track);
+      }
+    }
+
     this.wirePeerConnection(this.pc);
 
     if (this.config.localPeerId === "peer_a") {
@@ -144,6 +152,7 @@ export class LiveWebRtcSession {
     this.statsSamples = [];
     this.setPhase("observing");
 
+    this.clockEngine?.stopProbes();
     if (this.clockEngine && this.dc?.readyState === "open") {
       this.clockEngine.start({ intervalMs: probeIntervalMs, count: probeCount });
     }
@@ -310,6 +319,7 @@ export class LiveWebRtcSession {
         this.evaluateReadyToObserve();
       });
       this.clockEngine.attach(channel);
+      this.clockEngine.start({ intervalMs: 500, count: 3 });
     };
     channel.onclose = () => {
       this.callbacks.onDataChannelState("closed");

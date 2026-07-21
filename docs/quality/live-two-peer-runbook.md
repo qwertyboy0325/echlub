@@ -1,5 +1,7 @@
 # Live Two-Peer Runbook
 
+> **Status: SUSPENDED** pending owner manual two-device observation. Automated correction package (ECHLUB-PERFORMANCE-LAB-REAUDIT-CORRECTION-01) hardens harness and validators; live endpoint evidence still requires owner run per stop gate `OWNER_LIVE_RUN_REQUIRED`.
+
 ## Host device
 
 ```bash
@@ -30,8 +32,9 @@ Open `http://localhost:5173` on the peer device. Enter `ws://<HOST_LAN_IP>:8080/
 3. Generate/copy the same session correlation ID on both devices.
 4. Assign `peer_a` on host, `peer_b` on peer; same capture profile.
 5. Acknowledge headphones, prepare, enable microphone, connect.
-6. Wait for Ready To Observe; run 60-second observation on both.
-7. Export endpoint artifacts from each device.
-8. Copy to `.local/live-observation-import/peer-a.json` and `peer-b.json`.
+6. Wait for **Ready To Observe** (clock warmup probes must succeed).
+7. Run 60-second observation on both.
+8. Export endpoint artifacts from each device.
+9. Copy to `.local/live-observation-import/peer-a.json` and `peer-b.json` (gitignored; never commit).
 
 Do not expose port 8080 to the public Internet.

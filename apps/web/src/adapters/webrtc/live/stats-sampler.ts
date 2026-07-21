@@ -157,6 +157,7 @@ export class StatsSampler {
   private samples: NormalizedStatsSample[] = [];
   private prev: NormalizedStatsSample | null = null;
   private startMs = 0;
+  private sampling = false;
 
   constructor(
     private readonly pc: RTCPeerConnection,
@@ -169,19 +170,25 @@ export class StatsSampler {
     this.prev = null;
     this.startMs = performance.now();
     const tick = async () => {
-      if (this.samples.length >= maxSamples) {
-        this.stop();
-        return;
+      if (this.sampling) return;
+      this.sampling = true;
+      try {
+        if (this.samples.length >= maxSamples) {
+          this.stop();
+          return;
+        }
+        const offsetMs = performance.now() - this.startMs;
+        if (offsetMs > durationMs) {
+          this.stop();
+          return;
+        }
+        const sample = await collectNormalizedStats(this.pc, offsetMs, this.prev);
+        this.prev = sample;
+        this.samples.push(sample);
+        this.onSample(sample);
+      } finally {
+        this.sampling = false;
       }
-      const offsetMs = performance.now() - this.startMs;
-      if (offsetMs > durationMs) {
-        this.stop();
-        return;
-      }
-      const sample = await collectNormalizedStats(this.pc, offsetMs, this.prev);
-      this.prev = sample;
-      this.samples.push(sample);
-      this.onSample(sample);
     };
     void tick();
     this.timer = setInterval(() => void tick(), intervalMs);

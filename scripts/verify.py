@@ -20,6 +20,16 @@ def run(label: str, cmd: list[str]) -> bool:
     return True
 
 
+def run_expect_fail(label: str, cmd: list[str]) -> bool:
+    print(f"\n==> {label} (expect fail)")
+    result = subprocess.run(cmd, cwd=ROOT)
+    if result.returncode == 0:
+        print(f"FAILED: {label} should have failed", file=sys.stderr)
+        return False
+    print(f"OK: {label} failed as expected")
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-references", action="store_true")
@@ -70,6 +80,30 @@ def main() -> int:
                 ],
             ),
             (
+                "performance assess vector",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "assess-synthetic",
+                    "test-vectors/performance/synthetic-media-path-v1.json",
+                ],
+            ),
+            (
+                "performance zero-detection negative fixture",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate",
+                    "test-vectors/performance/synthetic-zero-detection-v1.json",
+                ],
+            ),
+            (
                 "live endpoint test vector",
                 [
                     "cargo",
@@ -87,7 +121,14 @@ def main() -> int:
     if not args.skip_references:
         steps.append(("reference cleanliness (end)", ["python3", "scripts/check-references.py"]))
 
-    failed = [label for label, cmd in steps if not run(label, cmd)]
+    failed = []
+    for label, cmd in steps:
+        if label == "performance zero-detection negative fixture":
+            ok = run_expect_fail(label, cmd)
+        else:
+            ok = run(label, cmd)
+        if not ok:
+            failed.append(label)
     print("\n=== Verification summary ===")
     if failed:
         print("FAILED steps:")

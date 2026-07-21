@@ -23,6 +23,21 @@ pub fn compute_derived_metrics(run: &PerformanceRunV1) -> DerivedMetrics {
     let emit = extract_observed(&run.timing.pulse_emit_ms);
     let detect = extract_observed(&run.timing.pulse_detect_ms);
     let rtt = extract_observed(&run.timing.datachannel_rtt_ms);
+    let pulses_detected = extract_observed(&run.synthetic_pulse.pulses_detected);
+
+    if pulses_detected.map(|v| v <= 0.0).unwrap_or(true) {
+        return DerivedMetrics {
+            end_to_end_synthetic_ms: unavailable(
+                "no pulse detections for end-to-end synthetic metric",
+            ),
+            setup_to_first_pulse_ms: match (setup, emit) {
+                (Some(s), Some(e)) => observed(s + e),
+                (Some(s), None) => observed(s),
+                _ => unavailable("connection setup or pulse emit timing unavailable"),
+            },
+            datachannel_overhead_ms: unavailable("loopback latency unavailable without detections"),
+        };
+    }
 
     let end_to_end_synthetic_ms = match (loopback, emit, detect) {
         (Some(l), Some(e), Some(d)) => observed(l + (d - e)),

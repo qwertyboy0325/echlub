@@ -1,6 +1,7 @@
 use echlub_performance::{
-    pair_live_endpoints, parse_and_validate, parse_and_validate_live_endpoint, summarize_run,
-    validate_live_directory, validate_live_endpoint, validate_run, PerformanceRunV1,
+    assess_synthetic_observation, pair_live_endpoints, parse_and_validate,
+    parse_and_validate_live_endpoint, summarize_run, validate_live_directory,
+    validate_live_endpoint, validate_run, PerformanceRunV1,
 };
 use std::env;
 use std::fs;
@@ -12,6 +13,7 @@ fn usage() {
         "Usage: performance-report <command> [args]\n\
 Commands:\n\
   validate <file>\n\
+  assess-synthetic <file>\n\
   summarize <file>\n\
   verify-directory <dir>\n\
   validate-live-endpoint <file>\n\
@@ -30,6 +32,7 @@ fn main() {
 
     match args[1].as_str() {
         "validate" => validate_file(require_path(&args, 2)),
+        "assess-synthetic" => assess_file(require_path(&args, 2)),
         "summarize" => summarize_file(require_path(&args, 2)),
         "verify-directory" => verify_directory(require_path(&args, 2)),
         "validate-live-endpoint" => validate_live_file(require_path(&args, 2)),
@@ -77,6 +80,20 @@ fn validate_file(path: &Path) {
         println!("VALID: {}", path.display());
     } else {
         eprintln!("INVALID: {}", path.display());
+        for err in &result.errors {
+            eprintln!("  - {err}");
+        }
+        process::exit(1);
+    }
+}
+
+fn assess_file(path: &Path) {
+    let json = read_file(path);
+    let result = assess_synthetic_observation(&json);
+    if result.pass {
+        println!("ASSESS PASS: {}", path.display());
+    } else {
+        eprintln!("ASSESS FAIL: {}", path.display());
         for err in &result.errors {
             eprintln!("  - {err}");
         }

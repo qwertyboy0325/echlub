@@ -1,7 +1,7 @@
 use echlub_performance::{
-    compute_derived_metrics, summarize_run, validate_run, EvidenceLevel, EvidenceStatus,
-    MetricValue, PerformanceRunV1, RunMetadata, SyntheticPulseMetrics, TimingMetrics,
-    TransportObservation, SCHEMA_VERSION,
+    assess_synthetic_observation, compute_derived_metrics, summarize_run, validate_run,
+    EvidenceLevel, EvidenceStatus, MetricValue, PerformanceRunV1, RunMetadata,
+    SyntheticPulseMetrics, TimingMetrics, TransportObservation, SCHEMA_VERSION,
 };
 
 fn sample_run() -> PerformanceRunV1 {
@@ -151,4 +151,41 @@ fn metric_value_variants_serialize() {
     };
     let json = serde_json::to_string(&unavailable).unwrap();
     assert!(json.contains("\"kind\":\"unavailable\""));
+}
+
+#[test]
+fn rejects_zero_detection_artifact() {
+    let json = include_str!("../../../test-vectors/performance/synthetic-zero-detection-v1.json");
+    let result = validate_run(json);
+    assert!(!result.valid, "errors: {:?}", result.errors);
+}
+
+#[test]
+fn assess_rejects_zero_detection_artifact() {
+    let json = include_str!("../../../test-vectors/performance/synthetic-zero-detection-v1.json");
+    let result = assess_synthetic_observation(json);
+    assert!(!result.pass, "errors: {:?}", result.errors);
+}
+
+#[test]
+fn assess_accepts_valid_run() {
+    let run = sample_run();
+    let json = serde_json::to_string(&run).unwrap();
+    let result = assess_synthetic_observation(&json);
+    assert!(result.pass, "errors: {:?}", result.errors);
+}
+
+#[test]
+fn derived_metrics_unavailable_without_detections() {
+    let mut run = sample_run();
+    run.synthetic_pulse.pulses_detected = MetricValue::Observed { value: 0.0 };
+    run.synthetic_pulse.detection_rate = MetricValue::Observed { value: 0.0 };
+    run.timing.loopback_latency_ms = MetricValue::Unavailable {
+        reason: "no detections".into(),
+    };
+    let derived = compute_derived_metrics(&run);
+    assert!(matches!(
+        derived.end_to_end_synthetic_ms,
+        MetricValue::Unavailable { .. }
+    ));
 }

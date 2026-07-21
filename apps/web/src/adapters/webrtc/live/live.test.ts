@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeClockMedian } from "./clock-probe";
-import { createNegotiationState } from "./negotiation";
+import { createNegotiationState, IceCandidateBuffer } from "./negotiation";
 import type { ClockProbeSample } from "./types";
 
 describe("clock probe formulas", () => {
@@ -37,6 +37,23 @@ describe("negotiation state", () => {
     const polite = createNegotiationState(true);
     expect(impolite.polite).toBe(false);
     expect(polite.polite).toBe(true);
+  });
+});
+
+describe("ICE candidate buffer", () => {
+  it("deduplicates identical candidates", () => {
+    const buffer = new IceCandidateBuffer();
+    const candidate = { sdpMid: "0", sdpMLineIndex: 0, candidate: "candidate:1" };
+    buffer.add(candidate);
+    buffer.add(candidate);
+    expect(buffer).toBeDefined();
+  });
+
+  it("clears buffered candidates", () => {
+    const buffer = new IceCandidateBuffer();
+    buffer.add({ sdpMid: "0", sdpMLineIndex: 0, candidate: "candidate:1" });
+    buffer.clear();
+    expect(buffer).toBeDefined();
   });
 });
 

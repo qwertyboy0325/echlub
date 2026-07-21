@@ -30,4 +30,4 @@ Each run directory must pass both `validate` and `assess-synthetic`.
 
 ## Status
 
-Pending corrected synthetic rerun (Phase D).
+Corrected synthetic run `synthetic-2026-07-21T10-01-14-749008Z` passes validate + assess-synthetic. See `evidence/performance-baseline/manifest.json`.

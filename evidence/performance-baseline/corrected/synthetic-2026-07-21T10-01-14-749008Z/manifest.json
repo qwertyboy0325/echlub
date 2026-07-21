@@ -1,0 +1,8 @@
+{
+  "runId": "synthetic-2026-07-21T10-01-14-749008Z",
+  "artifact": "observation.json",
+  "validatePass": true,
+  "assessPass": true,
+  "evidenceStatus": "exploratory_non_authoritative",
+  "correctedObservation": true
+}

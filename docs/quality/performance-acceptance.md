@@ -6,8 +6,9 @@
 
 1. `pnpm verify` — full foundation + performance crate tests
 2. `pnpm performance:test` — performance unit + signaling tests
-3. `pnpm performance:synthetic` — browser harness (PASS if browser available)
+3. `pnpm performance:synthetic` — browser harness writing to `evidence/performance-baseline/corrected/<run-id>/`
 4. Evidence validation via `echlub-performance-report validate`
+5. Observation quality via `echlub-performance-report assess-synthetic`
 
 ## Explicit non-claims
 
@@ -19,7 +20,7 @@
 ## PASS criteria
 
 - All verify steps pass
-- System browser synthetic run produces validated evidence artifact
+- System browser synthetic run produces validated + assessed evidence under `corrected/<run-id>/`
 - Audit: no critical/high findings
 
 ## PARTIAL criteria
