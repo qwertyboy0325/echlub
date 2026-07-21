@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "PerformanceRunV1",
+  "evidenceLevel": "browser_synthetic_media_path",
+  "evidenceStatus": "exploratory_non_authoritative",
+  "metadata": {
+    "runId": "synthetic-1784622583726",
+    "startedAt": "2026-07-21T08:29:43.726Z",
+    "completedAt": "2026-07-21T08:29:43.726Z",
+    "harnessVersion": "0.1.0",
+    "browserFamily": "chromium",
+    "platform": "MacIntel"
+  },
+  "timing": {
+    "pulseEmitMs": {
+      "kind": "observed",
+      "value": 1257.3999999761581
+    },
+    "pulseDetectMs": {
+      "kind": "observed",
+      "value": 0
+    },
+    "loopbackLatencyMs": {
+      "kind": "observed",
+      "value": 0
+    },
+    "datachannelRttMs": {
+      "kind": "observed",
+      "value": 0.19999998807907104
+    },
+    "iceGatheringMs": {
+      "kind": "observed",
+      "value": 43.30000001192093
+    },
+    "connectionSetupMs": {
+      "kind": "observed",
+      "value": 275.60000002384186
+    }
+  },
+  "syntheticPulse": {
+    "pulsesEmitted": {
+      "kind": "observed",
+      "value": 5
+    },
+    "pulsesDetected": {
+      "kind": "observed",
+      "value": 0
+    },
+    "detectionRate": {
+      "kind": "observed",
+      "value": 0
+    },
+    "meanDetectionLatencyMs": {
+      "kind": "observed",
+      "value": 0
+    },
+    "jitterMs": {
+      "kind": "observed",
+      "value": 0
+    }
+  },
+  "transport": {
+    "candidatePairType": {
+      "kind": "unsupported"
+    },
+    "bytesSent": {
+      "kind": "observed",
+      "value": 929
+    },
+    "bytesReceived": {
+      "kind": "observed",
+      "value": 0
+    },
+    "packetsLost": {
+      "kind": "observed",
+      "value": 0
+    }
+  }
+}
