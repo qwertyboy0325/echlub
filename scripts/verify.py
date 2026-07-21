@@ -69,6 +69,18 @@ def main() -> int:
                     "test-vectors/performance/harness-validation-v1.json",
                 ],
             ),
+            (
+                "live endpoint test vector",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-peer-a-v1.json",
+                ],
+            ),
         ]
     )
 

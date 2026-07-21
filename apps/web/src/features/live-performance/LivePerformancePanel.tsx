@@ -1,137 +1,204 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_SIGNALING_URL } from "../../adapters/signaling/client";
 import { LiveWebRtcSession } from "../../adapters/webrtc/live/session";
 import {
-  downloadJson,
-  EVIDENCE_STATUS,
-  PERFORMANCE_DISCLAIMER,
-  SCHEMA_VERSION,
-  sanitizeForExport,
-  unavailable,
-  unsupported,
-  type PerformanceRunDraft,
-} from "../../shared/performance/types";
+  generateSessionCorrelationId,
+  type CaptureProfile,
+  type LiveSessionPhase,
+  type PeerRole,
+} from "../../adapters/webrtc/live/types";
+import { downloadJson } from "../../shared/performance/types";
 
-type PeerRole = "peer-a" | "peer-b";
+const PRIVACY_NOTICE =
+  "Use headphones. Raw microphone audio is exchanged through WebRTC and is not stored by EchLub. " +
+  "The signaling server relays negotiation messages only. Exported evidence excludes SDP, ICE addresses, " +
+  "device identifiers, device labels, and raw audio. This is not an acoustic mouth-to-ear measurement.";
+
+const PHASE_LABELS: Record<LiveSessionPhase, string> = {
+  idle: "Idle",
+  prepared: "Prepared",
+  microphone_ready: "Microphone Ready",
+  signaling_connecting: "Signaling Connecting",
+  peer_present: "Peer Present",
+  negotiating: "Negotiating",
+  connected: "Connected",
+  ready_to_observe: "Ready To Observe",
+  observing: "Observing",
+  finalizing: "Finalizing",
+  completed: "Completed",
+  failed: "Failed",
+  stopped: "Stopped",
+};
 
 export function LivePerformancePanel() {
-  const [role, setRole] = useState<PeerRole>("peer-a");
-  const [sessionId, setSessionId] = useState("live-session-001");
-  const [connectionState, setConnectionState] = useState<string>("new");
-  const [micEnabled, setMicEnabled] = useState(false);
-  const [clockRtt, setClockRtt] = useState<number | null>(null);
+  const [role, setRole] = useState<PeerRole>("peer_a");
+  const [correlationId, setCorrelationId] = useState(generateSessionCorrelationId);
+  const [signalingUrl, setSignalingUrl] = useState(DEFAULT_SIGNALING_URL);
+  const [captureProfile, setCaptureProfile] = useState<CaptureProfile>("browser_default");
+  const [phase, setPhase] = useState<LiveSessionPhase>("idle");
+  const [connectionState, setConnectionState] = useState("new");
+  const [iceState, setIceState] = useState("new");
+  const [dcState, setDcState] = useState("closed");
+  const [sampleCount, setSampleCount] = useState(0);
+  const [probeCount, setProbeCount] = useState(0);
+  const [clockRttMedian, setClockRttMedian] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [headphonesAck, setHeadphonesAck] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sessionRef = useRef<LiveWebRtcSession | null>(null);
+  const probeValues = useRef<number[]>([]);
+  const observeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const startSession = useCallback(async () => {
-    setError(null);
-    const localPeerId = role;
-    const remotePeerId = role === "peer-a" ? "peer-b" : "peer-a";
+  const canPrepare = phase === "idle";
+  const canEnableMic = headphonesAck && (phase === "prepared" || phase === "idle");
+  const canConnect = phase === "microphone_ready";
+  const canObserve = phase === "ready_to_observe" || phase === "connected";
+  const canExport = phase === "completed";
+  const canStop = phase !== "idle" && phase !== "stopped";
 
-    const session = new LiveWebRtcSession(
-      { sessionId, localPeerId, remotePeerId },
-      {
-        onConnectionState: setConnectionState,
-        onRemoteStream: (stream) => {
-          const audio = document.getElementById("remote-audio") as HTMLAudioElement | null;
-          if (audio) audio.srcObject = stream;
-        },
-        onDataChannelMessage: () => {},
-        onClockProbe: setClockRtt,
-        onError: setError,
-      },
-    );
-    sessionRef.current = session;
-    await session.start();
-  }, [role, sessionId]);
-
-  const enableMic = useCallback(async () => {
-    await sessionRef.current?.enableMicrophone();
-    setMicEnabled(true);
+  useEffect(() => () => {
+    sessionRef.current?.stop();
+    if (observeTimer.current) clearInterval(observeTimer.current);
   }, []);
 
-  const probeClock = useCallback(() => {
-    sessionRef.current?.sendClockProbe();
+  const callbacks = useMemo(
+    () => ({
+      onPhaseChange: setPhase,
+      onSignalingState: () => {},
+      onConnectionState: setConnectionState,
+      onIceState: setIceState,
+      onDataChannelState: setDcState,
+      onRemoteStream: (stream: MediaStream) => {
+        const audio = document.getElementById("remote-audio") as HTMLAudioElement | null;
+        if (audio) audio.srcObject = stream;
+      },
+      onMicrophoneState: () => {},
+      onNegotiation: () => {},
+      onClockProbe: (sample: { rttMs: number | null; timeout: boolean }) => {
+        if (sample.rttMs !== null && !sample.timeout) {
+          probeValues.current.push(sample.rttMs);
+          const sorted = [...probeValues.current].sort((a, b) => a - b);
+          setClockRttMedian(sorted[Math.floor(sorted.length / 2)] ?? null);
+        }
+        setProbeCount((c) => c + 1);
+      },
+      onStatsSample: () => setSampleCount((c) => c + 1),
+      onError: setError,
+    }),
+    [],
+  );
+
+  const prepare = useCallback(() => {
+    setError(null);
+    const session = new LiveWebRtcSession(
+      {
+        sessionCorrelationId: correlationId,
+        localPeerId: role,
+        signalingUrl,
+        captureProfile,
+        softwareCommit: "83d9303",
+      },
+      callbacks,
+    );
+    session.prepare();
+    sessionRef.current = session;
+  }, [callbacks, captureProfile, correlationId, role, signalingUrl]);
+
+  const enableMic = useCallback(async () => {
+    await sessionRef.current?.enableMicrophone(captureProfile);
+  }, [captureProfile]);
+
+  const connect = useCallback(async () => {
+    await sessionRef.current?.connect();
+  }, []);
+
+  const startObservation = useCallback(async () => {
+    setElapsed(0);
+    observeTimer.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    await sessionRef.current?.startObservation({ durationSeconds: 60, probeCount: 30 });
+    if (observeTimer.current) clearInterval(observeTimer.current);
   }, []);
 
   const exportEvidence = useCallback(() => {
-    const draft: PerformanceRunDraft = {
-      schemaVersion: SCHEMA_VERSION,
-      evidenceLevel: "browser_network_observation",
-      evidenceStatus: EVIDENCE_STATUS,
-      metadata: {
-        runId: `live-${sessionId}-${Date.now()}`,
-        startedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        harnessVersion: "0.1.0",
-        browserFamily: null,
-        platform: navigator.platform ?? null,
-      },
-      timing: {
-        pulseEmitMs: unsupported(),
-        pulseDetectMs: unsupported(),
-        loopbackLatencyMs: unsupported(),
-        datachannelRttMs: clockRtt !== null ? { kind: "observed", value: clockRtt } : unavailable("no probe sent"),
-        iceGatheringMs: unsupported(),
-        connectionSetupMs: unsupported(),
-      },
-      syntheticPulse: {
-        pulsesEmitted: unsupported(),
-        pulsesDetected: unsupported(),
-        detectionRate: unsupported(),
-        meanDetectionLatencyMs: unsupported(),
-        jitterMs: unsupported(),
-      },
-      transport: {
-        candidatePairType: unsupported(),
-        bytesSent: unsupported(),
-        bytesReceived: unsupported(),
-        packetsLost: unsupported(),
-      },
-    };
-    downloadJson(`live-performance-${sessionId}.json`, sanitizeForExport(draft));
-  }, [sessionId, clockRtt]);
+    const draft = sessionRef.current?.exportEndpointDraft();
+    if (!draft) return;
+    downloadJson(`${role}-${correlationId.slice(0, 8)}.json`, draft);
+  }, [correlationId, role]);
 
-  const stopSession = useCallback(() => {
+  const disconnect = useCallback(() => {
     sessionRef.current?.stop();
     sessionRef.current = null;
-    setMicEnabled(false);
-    setConnectionState("closed");
+    setPhase("stopped");
   }, []);
+
+  const reset = useCallback(() => {
+    disconnect();
+    setCorrelationId(generateSessionCorrelationId());
+    setPhase("idle");
+    setSampleCount(0);
+    setProbeCount(0);
+    setClockRttMedian(null);
+    setElapsed(0);
+    setHeadphonesAck(false);
+    probeValues.current = [];
+  }, [disconnect]);
 
   return (
     <section className="performance-panel">
-      <h2>Live Performance Session</h2>
-      <p className="disclaimer">{PERFORMANCE_DISCLAIMER}</p>
-      <p className="privacy-notice">
-        Privacy: no IP addresses, SDP, ICE candidates, or device identifiers are stored in exported evidence.
-        Microphone access requires explicit button click.
-      </p>
+      <h2>Live Two-Peer Observation</h2>
+      <p className="privacy-notice">{PRIVACY_NOTICE}</p>
 
       <div className="controls">
         <label>
-          Session ID
-          <input value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
+          Session correlation ID
+          <input value={correlationId} readOnly />
+          <button type="button" onClick={() => setCorrelationId(generateSessionCorrelationId())}>
+            Generate
+          </button>
+          <button type="button" onClick={() => navigator.clipboard.writeText(correlationId)}>
+            Copy
+          </button>
+        </label>
+        <label>
+          Signaling URL (not exported)
+          <input value={signalingUrl} onChange={(e) => setSignalingUrl(e.target.value)} />
         </label>
         <label>
           Role
           <select value={role} onChange={(e) => setRole(e.target.value as PeerRole)}>
-            <option value="peer-a">Peer A</option>
-            <option value="peer-b">Peer B</option>
+            <option value="peer_a">Peer A</option>
+            <option value="peer_b">Peer B</option>
           </select>
         </label>
-        <button onClick={startSession}>Connect</button>
-        <button onClick={enableMic} disabled={!sessionRef.current || micEnabled}>
-          Enable Microphone
-        </button>
-        <button onClick={probeClock} disabled={connectionState !== "connected"}>
-          Clock Probe
-        </button>
-        <button onClick={exportEvidence}>Export Local JSON</button>
-        <button onClick={stopSession}>Disconnect</button>
+        <label>
+          Capture profile
+          <select value={captureProfile} onChange={(e) => setCaptureProfile(e.target.value as CaptureProfile)}>
+            <option value="browser_default">browser_default</option>
+            <option value="music_low_latency">music_low_latency</option>
+          </select>
+        </label>
+        <label>
+          <input type="checkbox" checked={headphonesAck} onChange={(e) => setHeadphonesAck(e.target.checked)} />
+          I am using headphones and understand this is an experimental live-audio session.
+        </label>
       </div>
 
-      <p>Connection: {connectionState}</p>
-      {clockRtt !== null && <p>DataChannel RTT: {clockRtt.toFixed(2)} ms</p>}
+      <div className="controls">
+        <button onClick={prepare} disabled={!canPrepare}>Prepare</button>
+        <button onClick={enableMic} disabled={!canEnableMic}>Enable Microphone</button>
+        <button onClick={connect} disabled={!canConnect}>Connect</button>
+        <button onClick={startObservation} disabled={!canObserve}>Start 60s Observation</button>
+        <button onClick={exportEvidence} disabled={!canExport}>Export Endpoint</button>
+        <button onClick={disconnect} disabled={!canStop}>Disconnect</button>
+        <button onClick={reset}>Reset</button>
+      </div>
+
+      <p>Phase: {PHASE_LABELS[phase]}</p>
+      <p>Connection: {connectionState} | ICE: {iceState} | DataChannel: {dcState}</p>
+      <p>Samples: {sampleCount} | Probes: {probeCount} | Elapsed: {elapsed}s</p>
+      {clockRttMedian !== null && (
+        <p>Clock-probe RTT median: {clockRttMedian.toFixed(2)} ms (estimate; not one-way latency)</p>
+      )}
       {error && <p className="error">{error}</p>}
       <audio id="remote-audio" autoPlay />
     </section>

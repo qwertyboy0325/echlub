@@ -7,6 +7,7 @@ export interface SignalingClientOptions {
   onMessage: (payload: unknown) => void;
   onPeerJoined?: (peerId: string) => void;
   onPeerLeft?: (peerId: string) => void;
+  onConnected?: () => void;
   onError?: (error: string) => void;
 }
 
@@ -22,6 +23,10 @@ export class SignalingClient {
     const base = this.options.url ?? DEFAULT_SIGNALING_URL;
     const url = `${base}?session_id=${encodeURIComponent(this.options.sessionId)}&peer_id=${encodeURIComponent(this.options.peerId)}`;
     this.ws = new WebSocket(url);
+
+    this.ws.onopen = () => {
+      this.options.onConnected?.();
+    };
 
     this.ws.onmessage = (event) => {
       try {

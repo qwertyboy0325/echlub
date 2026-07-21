@@ -23,6 +23,12 @@
     "performance:live": "pnpm --filter @echlub/web dev",
     "performance:test": "cargo test -p echlub-performance && cargo test -p echlub-control-plane --test signaling",
     "performance:verify": "python3 scripts/run-performance-baseline.py --validate-only",
+    "live:host": "python3 scripts/run-live-two-peer.py host",
+    "live:peer": "python3 scripts/run-live-two-peer.py peer",
+    "live:test": "cargo test -p echlub-performance && cargo test -p echlub-control-plane && corepack pnpm --filter @echlub/web test run",
+    "live:verify": "python3 scripts/run-live-two-peer.py verify && python3 scripts/check-references.py",
+    "live:validate-endpoint": "cargo run -p echlub-performance-report -- validate-live-endpoint",
+    "live:pair": "cargo run -p echlub-performance-report -- pair-live-endpoints",
     "verify": "python3 scripts/verify.py"
   }
 }

@@ -33,3 +33,6 @@ coverage/
 
 # Logs
 *.log
+
+# Owner live observation imports (never commit)
+.local/live-observation-import/

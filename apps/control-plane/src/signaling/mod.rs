@@ -7,10 +7,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::config::validate_origin;
+
 const MAX_MESSAGE_BYTES: usize = 16_384;
 const MAX_PEERS_PER_SESSION: usize = 2;
 const MAX_SESSION_ID_LEN: usize = 64;
 const MAX_PEER_ID_LEN: usize = 64;
+const ALLOWED_RELAY_TYPES: &[&str] = &["description", "ice_candidate", "control", "relay"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -43,23 +46,38 @@ pub struct SignalingQuery {
     pub peer_id: String,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct SignalingState {
     inner: Arc<Mutex<HashMap<String, SessionRoom>>>,
+    extra_origins: Arc<Vec<String>>,
 }
 
 struct SessionRoom {
     peers: HashMap<String, tokio::sync::broadcast::Sender<String>>,
 }
 
-pub fn validate_origin(headers: &HeaderMap) -> bool {
-    match headers.get("origin").and_then(|v| v.to_str().ok()) {
-        Some(origin) => {
-            origin.starts_with("http://localhost")
-                || origin.starts_with("http://127.0.0.1")
-                || origin.starts_with("https://localhost")
-                || origin.starts_with("https://127.0.0.1")
+impl SignalingState {
+    pub fn new(extra_origins: Vec<String>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            extra_origins: Arc::new(extra_origins),
         }
+    }
+
+    pub fn default_with_origins(extra_origins: Vec<String>) -> Self {
+        Self::new(extra_origins)
+    }
+}
+
+impl Default for SignalingState {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
+pub fn validate_origin_header(headers: &HeaderMap, extra_origins: &[String]) -> bool {
+    match headers.get("origin").and_then(|v| v.to_str().ok()) {
+        Some(origin) => validate_origin(origin, extra_origins),
         None => true,
     }
 }
@@ -81,13 +99,40 @@ pub fn validate_ids(session_id: &str, peer_id: &str) -> Result<(), (StatusCode, 
     Ok(())
 }
 
+pub fn validate_relay_envelope(text: &str) -> Result<serde_json::Value, &'static str> {
+    if text.len() > MAX_MESSAGE_BYTES {
+        return Err("oversized payload");
+    }
+    let value: serde_json::Value =
+        serde_json::from_str(text).map_err(|_| "malformed relay envelope")?;
+    let msg_type = value
+        .get("type")
+        .and_then(|v| v.as_str())
+        .ok_or("missing relay type")?;
+    if !ALLOWED_RELAY_TYPES.contains(&msg_type) {
+        return Err("unsupported relay type");
+    }
+    if msg_type == "relay" {
+        let payload = value.get("payload").ok_or("malformed relay envelope")?;
+        let inner_type = payload
+            .get("type")
+            .and_then(|v| v.as_str())
+            .ok_or("missing relay type")?;
+        if !["description", "ice_candidate", "control", "offer", "answer"].contains(&inner_type) {
+            return Err("unsupported relay type");
+        }
+        return Ok(payload.clone());
+    }
+    Ok(value)
+}
+
 pub async fn signaling_ws_handler(
     ws: axum::extract::WebSocketUpgrade,
     Query(query): Query<SignalingQuery>,
     State(state): State<SignalingState>,
     headers: HeaderMap,
 ) -> Response {
-    if !validate_origin(&headers) {
+    if !validate_origin_header(&headers, &state.extra_origins) {
         return (StatusCode::FORBIDDEN, "origin not allowed").into_response();
     }
     if let Err((status, msg)) = validate_ids(&query.session_id, &query.peer_id) {
@@ -102,11 +147,11 @@ async fn handle_socket(socket: WebSocket, state: SignalingState, query: Signalin
 
     let mut rx = match join_room(&state, &session_id, &peer_id) {
         Ok(rx) => rx,
-        Err(msg) => {
+        Err(code) => {
             let (mut sender, _) = socket.split();
             let err = SignalingMessage::Error {
-                code: "session_full".into(),
-                message: msg,
+                code: code.to_string(),
+                message: code.to_string(),
             };
             let _ = sender
                 .send(Message::Text(serde_json::to_string(&err).unwrap().into()))
@@ -136,10 +181,16 @@ async fn handle_socket(socket: WebSocket, state: SignalingState, query: Signalin
             incoming = receiver.next() => {
                 match incoming {
                     Some(Ok(Message::Text(text))) => {
-                        if text.len() > MAX_MESSAGE_BYTES {
-                            continue;
+                        match validate_relay_envelope(text.as_ref()) {
+                            Ok(payload) => relay_message(&state, &session_id, &peer_id, payload),
+                            Err(code) => {
+                                let err = SignalingMessage::Error {
+                                    code: code.to_string(),
+                                    message: code.to_string(),
+                                };
+                                let _ = sender.send(Message::Text(serde_json::to_string(&err).unwrap().into())).await;
+                            }
                         }
-                        relay_message(&state, &session_id, &peer_id, text.as_ref());
                     }
                     Some(Ok(Message::Close(_))) | None => break,
                     _ => {}
@@ -166,7 +217,7 @@ fn join_room(
     state: &SignalingState,
     session_id: &str,
     peer_id: &str,
-) -> Result<tokio::sync::broadcast::Receiver<String>, String> {
+) -> Result<tokio::sync::broadcast::Receiver<String>, &'static str> {
     let mut rooms = state.inner.lock().unwrap();
     let room = rooms
         .entry(session_id.to_string())
@@ -174,8 +225,12 @@ fn join_room(
             peers: HashMap::new(),
         });
 
-    if room.peers.len() >= MAX_PEERS_PER_SESSION && !room.peers.contains_key(peer_id) {
-        return Err(format!("max {MAX_PEERS_PER_SESSION} peers per session"));
+    if room.peers.contains_key(peer_id) {
+        return Err("duplicate peer");
+    }
+
+    if room.peers.len() >= MAX_PEERS_PER_SESSION {
+        return Err("session_full");
     }
 
     let (tx, rx) = tokio::sync::broadcast::channel(32);
@@ -194,8 +249,7 @@ fn join_room(
     Ok(rx)
 }
 
-fn relay_message(state: &SignalingState, session_id: &str, from: &str, text: &str) {
-    let payload: serde_json::Value = serde_json::from_str(text).unwrap_or_default();
+fn relay_message(state: &SignalingState, session_id: &str, from: &str, payload: serde_json::Value) {
     let relay = SignalingMessage::Relay {
         from: from.to_string(),
         payload,
@@ -240,8 +294,20 @@ mod tests {
     }
 
     #[test]
-    fn validate_ids_accepts_valid() {
-        assert!(validate_ids("session-1", "peer_a").is_ok());
+    fn validate_relay_rejects_oversized() {
+        let big = "a".repeat(MAX_MESSAGE_BYTES + 1);
+        assert_eq!(
+            validate_relay_envelope(&big).unwrap_err(),
+            "oversized payload"
+        );
+    }
+
+    #[test]
+    fn validate_relay_accepts_description() {
+        let payload = validate_relay_envelope(
+            r#"{"type":"relay","payload":{"type":"description","sdp":{"type":"offer","sdp":"x"}}}"#,
+        );
+        assert!(payload.is_ok());
     }
 
     #[test]

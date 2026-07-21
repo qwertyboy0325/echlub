@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "echlub.performance.live-observation/v1",
+  "evidenceLevel": "browser_network_observation",
+  "evidenceStatus": "exploratory_non_authoritative",
+  "runId": "live-test-peer-a",
+  "sessionCorrelationId": "0123456789abcdef0123456789abcdef",
+  "peerRole": "peer_a",
+  "startedAtUtc": "2026-07-21T09:00:00Z",
+  "completedAtUtc": "2026-07-21T09:01:00Z",
+  "softwareCommit": "83d9303",
+  "environment": {
+    "browserFamily": "chromium",
+    "platform": "darwin",
+    "secureContext": true,
+    "crossOriginIsolated": false,
+    "locale": "en-US"
+  },
+  "capture": {
+    "profile": "browser_default",
+    "requestedConstraints": { "echoCancellation": true },
+    "observedSettings": { "sampleRate": 48000, "channelCount": 1 }
+  },
+  "playout": {
+    "path": "html_media_element",
+    "remoteAudioTrackReceived": true,
+    "remoteAudioTrackUnmuted": true,
+    "autoplayAttempted": true
+  },
+  "connectionLifecycle": {
+    "peerConnectionState": "connected",
+    "iceConnectionState": "connected",
+    "signalingState": "stable"
+  },
+  "dataChannel": {
+    "label": "echlub-clock-probe",
+    "owner": true,
+    "ordered": false,
+    "maxRetransmits": 0,
+    "readyState": "open"
+  },
+  "clockProbes": {
+    "samples": [],
+    "medianRttMs": null,
+    "medianOffsetMs": null,
+    "offsetLimitation": "Clock offset is an estimate affected by route asymmetry and scheduling; not synchronized truth."
+  },
+  "statsSamples": [],
+  "unsupportedMetrics": {
+    "acousticMouthToEar": { "kind": "unsupported" },
+    "oneWayNetworkLatency": { "kind": "unavailable", "reason": "not measured" }
+  },
+  "limitations": [
+    "Exploratory non-authoritative browser network observation.",
+    "Not an acoustic mouth-to-ear measurement.",
+    "Test vector only."
+  ]
+}

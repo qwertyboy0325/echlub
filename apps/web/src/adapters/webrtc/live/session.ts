@@ -1,129 +1,397 @@
-export interface LiveSessionConfig {
-  sessionId: string;
-  localPeerId: string;
-  remotePeerId: string;
-  signalingUrl?: string;
-}
-
-export interface LiveSessionCallbacks {
-  onConnectionState: (state: RTCPeerConnectionState) => void;
-  onRemoteStream: (stream: MediaStream) => void;
-  onDataChannelMessage: (data: string) => void;
-  onClockProbe?: (rttMs: number) => void;
-  onError: (message: string) => void;
-}
+import { ClockProbeEngine, computeClockMedian } from "./clock-probe";
+import {
+  applySignalingDescription,
+  createAndSendOffer,
+  createNegotiationState,
+  IceCandidateBuffer,
+} from "./negotiation";
+import { StatsSampler } from "./stats-sampler";
+import {
+  captureConstraints,
+  DATA_CHANNEL_LABEL,
+  DEFAULT_OBSERVATION_SECONDS,
+  DEFAULT_PROBE_COUNT,
+  DEFAULT_PROBE_INTERVAL_MS,
+  DEFAULT_STATS_INTERVAL_MS,
+  LIVE_SCHEMA_VERSION,
+  MAX_OBSERVATION_SECONDS,
+  MAX_STATS_SAMPLES,
+  type CaptureProfile,
+  type ClockProbeSample,
+  type LiveSessionCallbacks,
+  type LiveSessionConfig,
+  type LiveSessionPhase,
+  type ObservationConfig,
+  type PeerRole,
+  unsupported,
+  unavailable,
+} from "./types";
 
 export class LiveWebRtcSession {
   private pc: RTCPeerConnection | null = null;
   private dc: RTCDataChannel | null = null;
+  private audioTransceiver: RTCRtpTransceiver | null = null;
   private localStream: MediaStream | null = null;
+  private remoteStream: MediaStream | null = null;
   private signaling: import("../../signaling/client").SignalingClient | null = null;
   private readonly config: LiveSessionConfig;
   private readonly callbacks: LiveSessionCallbacks;
-  private isInitiator = false;
+  private readonly polite: boolean;
+  private readonly negotiation = createNegotiationState(false);
+  private readonly iceBuffer = new IceCandidateBuffer();
+  private clockEngine: ClockProbeEngine | null = null;
+  private statsSampler: StatsSampler | null = null;
+  private phase: LiveSessionPhase = "idle";
+  private captureProfile: CaptureProfile = "browser_default";
+  private observationStartedAt: string | null = null;
+  private observationCompletedAt: string | null = null;
+  private clockSamples: ClockProbeSample[] = [];
+  private statsSamples: unknown[] = [];
+  private peerPresent = false;
+  private stopped = false;
+  private dataChannelProps: Record<string, unknown> = {};
+  private connectionLifecycle: Record<string, unknown> = {};
+  private playoutState: Record<string, unknown> = {};
+  private captureState: Record<string, unknown> = {};
 
   constructor(config: LiveSessionConfig, callbacks: LiveSessionCallbacks) {
     this.config = config;
     this.callbacks = callbacks;
+    this.polite = config.localPeerId === "peer_b";
+    this.negotiation.polite = this.polite;
+    this.captureProfile = config.captureProfile ?? "browser_default";
   }
 
-  async start(): Promise<void> {
-    this.pc = new RTCPeerConnection({ iceServers: [] });
-    this.pc.onconnectionstatechange = () => {
-      this.callbacks.onConnectionState(this.pc!.connectionState);
-    };
-    this.pc.ontrack = (event) => {
-      this.callbacks.onRemoteStream(event.streams[0]);
-    };
-    this.pc.ondatachannel = (event) => {
-      this.setupDataChannel(event.channel);
-    };
+  prepare(): void {
+    this.assertNotStopped();
+    this.setPhase("prepared");
+  }
 
-    this.dc = this.pc.createDataChannel("clock-probe");
-    this.setupDataChannel(this.dc);
+  async enableMicrophone(profile?: CaptureProfile): Promise<void> {
+    this.assertNotStopped();
+    if (profile) this.captureProfile = profile;
+    const constraints = captureConstraints(this.captureProfile);
+    this.localStream = await navigator.mediaDevices.getUserMedia({ audio: constraints, video: false });
+    const track = this.localStream.getAudioTracks()[0] ?? null;
+    const settings = track?.getSettings() ?? {};
+    this.captureState = {
+      profile: this.captureProfile,
+      requestedConstraints: constraints,
+      observedSettings: {
+        sampleRate: settings.sampleRate ?? null,
+        channelCount: settings.channelCount ?? null,
+        echoCancellation: settings.echoCancellation ?? null,
+        noiseSuppression: settings.noiseSuppression ?? null,
+        autoGainControl: settings.autoGainControl ?? null,
+      },
+    };
+    if (this.audioTransceiver?.sender && track) {
+      await this.audioTransceiver.sender.replaceTrack(track);
+    }
+    this.callbacks.onMicrophoneState(true);
+    this.setPhase("microphone_ready");
+  }
+
+  async connect(): Promise<void> {
+    this.assertNotStopped();
+    this.setPhase("signaling_connecting");
+    this.pc = new RTCPeerConnection({ iceServers: [] });
+    this.audioTransceiver = this.pc.addTransceiver("audio", { direction: "sendrecv" });
+    this.wirePeerConnection(this.pc);
+
+    if (this.config.localPeerId === "peer_a") {
+      this.dc = this.pc.createDataChannel(DATA_CHANNEL_LABEL, {
+        ordered: false,
+        maxRetransmits: 0,
+      });
+      this.setupDataChannel(this.dc, true);
+    }
 
     const { SignalingClient } = await import("../../signaling/client");
     this.signaling = new SignalingClient({
-      sessionId: this.config.sessionId,
+      sessionId: this.config.sessionCorrelationId,
       peerId: this.config.localPeerId,
       url: this.config.signalingUrl,
-      onMessage: (payload) => this.handleSignaling(payload),
+      onMessage: (payload) => void this.handleSignaling(payload),
       onPeerJoined: (peerId) => {
-        if (peerId !== this.config.localPeerId && !this.isInitiator) {
-          this.isInitiator = true;
-          void this.createOffer();
+        if (peerId !== this.config.localPeerId) {
+          this.peerPresent = true;
+          this.setPhase("peer_present");
+          if (this.config.localPeerId === "peer_a") {
+            void this.startNegotiation();
+          }
         }
+      },
+      onPeerLeft: () => {
+        this.peerPresent = false;
       },
       onError: this.callbacks.onError,
     });
     this.signaling.connect();
   }
 
-  async enableMicrophone(): Promise<void> {
-    this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    for (const track of this.localStream.getTracks()) {
-      this.pc?.addTrack(track, this.localStream);
+  async startObservation(config: ObservationConfig = {}): Promise<void> {
+    this.assertNotStopped();
+    const durationSeconds = Math.min(
+      config.durationSeconds ?? DEFAULT_OBSERVATION_SECONDS,
+      MAX_OBSERVATION_SECONDS,
+    );
+    const statsIntervalMs = config.statsIntervalMs ?? DEFAULT_STATS_INTERVAL_MS;
+    const probeIntervalMs = config.probeIntervalMs ?? DEFAULT_PROBE_INTERVAL_MS;
+    const probeCount = Math.min(config.probeCount ?? DEFAULT_PROBE_COUNT, 120);
+    this.observationStartedAt = new Date().toISOString();
+    this.clockSamples = [];
+    this.statsSamples = [];
+    this.setPhase("observing");
+
+    if (this.clockEngine && this.dc?.readyState === "open") {
+      this.clockEngine.start({ intervalMs: probeIntervalMs, count: probeCount });
     }
+    if (this.pc) {
+      this.statsSampler = new StatsSampler(this.pc, (sample) => {
+        this.statsSamples.push(sample);
+        this.callbacks.onStatsSample(sample);
+      });
+      this.statsSampler.start(
+        statsIntervalMs,
+        MAX_STATS_SAMPLES,
+        durationSeconds * 1000,
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, durationSeconds * 1000));
+    await this.stopObservation();
   }
 
-  sendClockProbe(): void {
-    if (this.dc?.readyState === "open") {
-      this.dc.send(JSON.stringify({ type: "clock_probe", sentAt: performance.now() }));
-    }
+  async stopObservation(): Promise<void> {
+    this.clockEngine?.stopProbes();
+    this.statsSampler?.stop();
+    this.observationCompletedAt = new Date().toISOString();
+    this.setPhase("finalizing");
+    this.setPhase("completed");
   }
 
-  private setupDataChannel(channel: RTCDataChannel): void {
-    this.dc = channel;
-    channel.onmessage = (event) => {
-      this.callbacks.onDataChannelMessage(event.data as string);
-      try {
-        const msg = JSON.parse(event.data as string) as { type: string; sentAt?: number };
-        if (msg.type === "clock_probe" && msg.sentAt !== undefined) {
-          const rtt = performance.now() - msg.sentAt;
-          this.callbacks.onClockProbe?.(rtt);
-          channel.send(JSON.stringify({ type: "clock_pong", sentAt: msg.sentAt }));
-        } else if (msg.type === "clock_pong" && msg.sentAt !== undefined) {
-          const rtt = performance.now() - msg.sentAt;
-          this.callbacks.onClockProbe?.(rtt);
-        }
-      } catch {
-        /* non-json messages ignored */
+  exportEndpointDraft(): Record<string, unknown> {
+    const medians = computeClockMedian(this.clockSamples);
+    return {
+      schemaVersion: LIVE_SCHEMA_VERSION,
+      evidenceLevel: "browser_network_observation",
+      evidenceStatus: "exploratory_non_authoritative",
+      runId: `live-${this.config.sessionCorrelationId}-${this.config.localPeerId}`,
+      sessionCorrelationId: this.config.sessionCorrelationId,
+      peerRole: this.config.localPeerId,
+      startedAtUtc: this.observationStartedAt ?? new Date().toISOString(),
+      completedAtUtc: this.observationCompletedAt ?? new Date().toISOString(),
+      softwareCommit: this.config.softwareCommit ?? "unknown",
+      environment: {
+        browserFamily: detectBrowserFamily(),
+        platform: navigator.platform ?? null,
+        secureContext: window.isSecureContext,
+        crossOriginIsolated: crossOriginIsolated,
+        locale: navigator.language,
+      },
+      capture: this.captureState,
+      playout: {
+        path: "html_media_element",
+        remoteAudioTrackReceived: this.remoteStream !== null,
+        remoteAudioTrackUnmuted: this.remoteStream?.getAudioTracks()[0]?.enabled ?? false,
+        autoplayAttempted: true,
+        ...this.playoutState,
+      },
+      connectionLifecycle: this.connectionLifecycle,
+      dataChannel: {
+        label: DATA_CHANNEL_LABEL,
+        ...this.dataChannelProps,
+      },
+      clockProbes: {
+        samples: this.clockSamples,
+        medianRttMs: medians.rtt,
+        medianOffsetMs: medians.offset,
+        offsetLimitation:
+          "Clock offset is an estimate affected by route asymmetry and scheduling; not synchronized truth.",
+      },
+      statsSamples: this.statsSamples,
+      unsupportedMetrics: {
+        acousticMouthToEar: unsupported(),
+        oneWayNetworkLatency: unavailable("not measured"),
+      },
+      limitations: [
+        "Exploratory non-authoritative browser network observation.",
+        "Not an acoustic mouth-to-ear measurement.",
+        "No measured one-way network latency.",
+        "No transport selection result.",
+        "Clock offset is an estimate only.",
+      ],
+    };
+  }
+
+  stop(): void {
+    if (this.stopped) return;
+    this.stopped = true;
+    this.clockEngine?.stop();
+    this.statsSampler?.stop();
+    this.localStream?.getTracks().forEach((t) => t.stop());
+    if (this.audioTransceiver?.sender) {
+      void this.audioTransceiver.sender.replaceTrack(null);
+    }
+    this.dc?.close();
+    this.pc?.close();
+    this.signaling?.disconnect();
+    this.iceBuffer.clear();
+    this.pc = null;
+    this.dc = null;
+    this.signaling = null;
+    this.remoteStream = null;
+    this.setPhase("stopped");
+  }
+
+  getPhase(): LiveSessionPhase {
+    return this.phase;
+  }
+
+  private wirePeerConnection(pc: RTCPeerConnection): void {
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      this.connectionLifecycle.peerConnectionState = state;
+      this.callbacks.onConnectionState(state);
+      if (state === "connected") {
+        this.setPhase("connected");
+        this.evaluateReadyToObserve();
       }
+    };
+    pc.oniceconnectionstatechange = () => {
+      this.connectionLifecycle.iceConnectionState = pc.iceConnectionState;
+      this.callbacks.onIceState(pc.iceConnectionState);
+    };
+    pc.onsignalingstatechange = () => {
+      this.connectionLifecycle.signalingState = pc.signalingState;
+      this.callbacks.onSignalingState(pc.signalingState);
+    };
+    pc.onnegotiationneeded = () => {
+      this.callbacks.onNegotiation("negotiation_needed");
+      if (this.config.localPeerId === "peer_a") {
+        void this.startNegotiation();
+      }
+    };
+    pc.ontrack = (event) => {
+      this.remoteStream = event.streams[0] ?? null;
+      this.callbacks.onRemoteStream(this.remoteStream!);
+      this.evaluateReadyToObserve();
+    };
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        this.signaling?.relay({
+          type: "ice_candidate",
+          candidate: event.candidate.toJSON(),
+        });
+      }
+    };
+    pc.ondatachannel = (event) => {
+      if (this.config.localPeerId === "peer_b") {
+        this.setupDataChannel(event.channel, false);
+      }
+    };
+  }
+
+  private setupDataChannel(channel: RTCDataChannel, owner: boolean): void {
+    this.dc = channel;
+    this.dataChannelProps = {
+      owner,
+      ordered: channel.ordered,
+      maxRetransmits: channel.maxRetransmits,
+      negotiated: channel.negotiated,
+    };
+    channel.onopen = () => {
+      this.dataChannelProps.readyState = channel.readyState;
+      this.callbacks.onDataChannelState(channel.readyState);
+      this.clockEngine = new ClockProbeEngine(this.config.localPeerId === "peer_a", (sample) => {
+        this.clockSamples.push(sample);
+        this.callbacks.onClockProbe(sample);
+        this.evaluateReadyToObserve();
+      });
+      this.clockEngine.attach(channel);
+    };
+    channel.onclose = () => {
+      this.callbacks.onDataChannelState("closed");
     };
   }
 
   private async handleSignaling(payload: unknown): Promise<void> {
-    const msg = payload as { type?: string; sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit };
     if (!this.pc) return;
+    const msg = payload as {
+      type?: string;
+      sdp?: RTCSessionDescriptionInit;
+      candidate?: RTCIceCandidateInit;
+      descriptionType?: RTCSdpType;
+    };
 
-    if (msg.type === "offer" && msg.sdp) {
-      await this.pc.setRemoteDescription(msg.sdp);
-      const answer = await this.pc.createAnswer();
-      await this.pc.setLocalDescription(answer);
-      this.signaling?.relay({ type: "answer", sdp: this.pc.localDescription });
-    } else if (msg.type === "answer" && msg.sdp) {
-      await this.pc.setRemoteDescription(msg.sdp);
+    if (msg.type === "description" || msg.type === "offer" || msg.type === "answer") {
+      this.setPhase("negotiating");
+      this.callbacks.onNegotiation("remote_description");
+      const envelope = {
+        type: "description" as const,
+        sdp: msg.sdp ?? { type: msg.type as RTCSdpType, sdp: "" },
+      };
+      await applySignalingDescription(
+        this.pc,
+        this.negotiation,
+        envelope,
+        (type, sdp) => this.relayDescription(type, sdp),
+      );
+      await this.iceBuffer.flush(this.pc);
     } else if (msg.type === "ice_candidate" && msg.candidate) {
-      await this.pc.addIceCandidate(msg.candidate);
+      if (this.pc.remoteDescription) {
+        try {
+          await this.pc.addIceCandidate(msg.candidate);
+        } catch {
+          this.iceBuffer.add(msg.candidate);
+        }
+      } else {
+        this.iceBuffer.add(msg.candidate);
+      }
     }
   }
 
-  private async createOffer(): Promise<void> {
-    if (!this.pc) return;
-    const offer = await this.pc.createOffer();
-    await this.pc.setLocalDescription(offer);
-    this.pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        this.signaling?.relay({ type: "ice_candidate", candidate: event.candidate });
-      }
-    };
-    this.signaling?.relay({ type: "offer", sdp: this.pc.localDescription });
+  private relayDescription(type: RTCSdpType, sdp: RTCSessionDescriptionInit): void {
+    this.signaling?.relay({ type: "description", descriptionType: type, sdp });
   }
 
-  stop(): void {
-    this.localStream?.getTracks().forEach((t) => t.stop());
-    this.signaling?.disconnect();
-    this.pc?.close();
-    this.pc = null;
+  private async startNegotiation(): Promise<void> {
+    if (!this.pc) return;
+    this.setPhase("negotiating");
+    this.callbacks.onNegotiation("local_offer");
+    await createAndSendOffer(this.pc, this.negotiation, (type, sdp) =>
+      this.relayDescription(type, sdp),
+    );
+  }
+
+  private evaluateReadyToObserve(): void {
+    const micReady = this.localStream !== null;
+    const connected = this.pc?.connectionState === "connected";
+    const remoteTrack = this.remoteStream !== null && this.remoteStream.getAudioTracks()[0]?.readyState !== "ended";
+    const dcOpen = this.dc?.readyState === "open";
+    const responsiveProbe = this.clockSamples.some((s) => !s.timeout && s.rttMs !== null);
+    if (micReady && connected && remoteTrack && dcOpen && responsiveProbe && this.phase !== "observing") {
+      this.setPhase("ready_to_observe");
+    }
+  }
+
+  private setPhase(phase: LiveSessionPhase): void {
+    this.phase = phase;
+    this.callbacks.onPhaseChange(phase);
+  }
+
+  private assertNotStopped(): void {
+    if (this.stopped) throw new Error("session stopped");
   }
 }
+
+function detectBrowserFamily(): string | null {
+  const ua = navigator.userAgent;
+  if (ua.includes("Chrome")) return "chromium";
+  if (ua.includes("Firefox")) return "firefox";
+  if (ua.includes("Safari")) return "safari";
+  return null;
+}
+
+export type { LiveSessionConfig, LiveSessionCallbacks, PeerRole, CaptureProfile, ObservationConfig };
