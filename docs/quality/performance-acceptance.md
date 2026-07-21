@@ -1,5 +1,7 @@
 # Performance Baseline Acceptance
 
+> **Supersession note (2026-07-21):** Acceptance criteria expanded by ECHLUB-PERFORMANCE-LAB-REAUDIT-CORRECTION-01. Synthetic PASS now requires `assess-synthetic` in addition to `validate`. See `performance-lab-reaudit-report.md`.
+
 ## Required checks
 
 1. `pnpm verify` — full foundation + performance crate tests
