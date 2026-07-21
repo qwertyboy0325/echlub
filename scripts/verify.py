@@ -56,6 +56,19 @@ def main() -> int:
             ("web build", ["corepack", "pnpm", "--filter", "@echlub/web", "build"]),
             ("protocol lab", ["cargo", "run", "-p", "echlub-protocol-lab", "--bin", "protocol-lab"]),
             ("control plane tests", ["cargo", "test", "-p", "echlub-control-plane"]),
+            ("performance crate tests", ["cargo", "test", "-p", "echlub-performance"]),
+            (
+                "performance test vectors",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate",
+                    "test-vectors/performance/harness-validation-v1.json",
+                ],
+            ),
         ]
     )
 

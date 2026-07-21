@@ -1,25 +1,26 @@
 # EchLub
 
-Collaborative music production platform — **foundation scaffold** for a greenfield rewrite.
+Collaborative music production platform — **foundation + performance baseline** scaffold for a greenfield rewrite.
 
-No low-latency, production-readiness, CRDT-completeness, or transport-selection claims are demonstrated in this package.
+No mouth-to-ear, production-readiness, CRDT-completeness, or transport-selection claims are demonstrated.
 
 Legacy repositories are external read-only references under `.reference/` (gitignored).
 
 ## Structure
 
-- `crates/` — Rust domain core (model, kernel, protocol, replication, session, web WASM)
-- `apps/web/` — React + Vite lab UI
-- `apps/control-plane/` — HTTP control plane skeleton
-- `apps/protocol-lab/` — Deterministic protocol scenario runner
-- `test-vectors/` — Canonical test fixtures
-- `docs/` — Architecture, quality, and reference archaeology
+- `crates/` — Rust domain core (model, kernel, protocol, replication, session, performance, web WASM)
+- `apps/web/` — React + Vite lab UI (foundation + performance sections)
+- `apps/control-plane/` — HTTP control plane with WebSocket signaling
+- `apps/performance-report/` — evidence validate/summarize CLI
+- `tools/performance-browser-harness/` — puppeteer-core synthetic harness
+- `evidence/performance-baseline/` — validated performance observations
 
 ## Quick start
 
 ```bash
 corepack pnpm install
 corepack pnpm verify
+corepack pnpm performance:synthetic
 ```
 
 ## Reference repos

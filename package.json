@@ -17,6 +17,12 @@
     "rust:test": "cargo test --workspace --all-features",
     "protocol:self-check": "cargo run -p echlub-protocol-lab --bin protocol-lab",
     "references:check": "python3 scripts/check-references.py",
+    "performance:synthetic": "python3 scripts/run-performance-baseline.py",
+    "performance:synthetic:validate": "python3 scripts/run-performance-baseline.py --validate-only",
+    "performance:report": "cargo run -p echlub-performance-report -- summarize",
+    "performance:live": "pnpm --filter @echlub/web dev",
+    "performance:test": "cargo test -p echlub-performance && cargo test -p echlub-control-plane --test signaling",
+    "performance:verify": "python3 scripts/run-performance-baseline.py --validate-only",
     "verify": "python3 scripts/verify.py"
   }
 }

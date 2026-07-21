@@ -4,7 +4,7 @@ Cross-agent entry for the EchLub rewrite monorepo.
 
 ## Product
 
-Web-first remote improvisational music system with a Rust canonical composition core and future performance plane. Foundation package implements semantic document operations only.
+Web-first remote improvisational music system with a Rust canonical composition core and performance baseline lab. Foundation package implements semantic document operations; performance baseline implements exploratory WebRTC instrumentation.
 
 ## Proof of behavior
 

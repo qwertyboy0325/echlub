@@ -1,0 +1,13 @@
+[package]
+name = "echlub-performance-report"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "performance-report"
+path = "src/main.rs"
+
+[dependencies]
+echlub-performance = { path = "../../crates/echlub-performance" }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

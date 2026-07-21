@@ -12,7 +12,8 @@ name = "control-plane"
 path = "src/main.rs"
 
 [dependencies]
-axum = { workspace = true }
+axum = { workspace = true, features = ["ws"] }
+futures-util = "0.3"
 echlub-model = { workspace = true }
 echlub-protocol = { workspace = true }
 echlub-session = { workspace = true }

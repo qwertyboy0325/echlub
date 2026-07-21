@@ -10,7 +10,7 @@ describe("App", () => {
   it("renders foundation disclaimer", () => {
     render(<App />);
     expect(
-      screen.getByText("Foundation laboratory — no live audio implementation yet"),
+      screen.getByText("EchLub Laboratory — foundation + performance baseline"),
     ).toBeInTheDocument();
   });
 

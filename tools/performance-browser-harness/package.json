@@ -1,0 +1,12 @@
+{
+  "name": "@echlub/performance-browser-harness",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "harness": "node src/run.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.8.2"
+  }
+}

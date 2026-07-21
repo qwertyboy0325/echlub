@@ -6,6 +6,6 @@ EchLub targets a Web-first remote improvisational music system:
 - **Composition plane** (foundation): intent-aware semantic replication over arrangement documents.
 - **Session fabric** (future): identity, epoch, capability negotiation, checkpoints.
 
-This repository currently implements the composition foundation only.
+This repository implements the composition foundation and an exploratory WebRTC performance baseline lab.
 
-No latency, production, or transport superiority claims are demonstrated.
+No latency superiority, production, or transport selection claims are demonstrated.

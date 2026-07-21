@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "PerformanceRunV1",
+  "evidenceLevel": "harness_validation",
+  "evidenceStatus": "exploratory_non_authoritative",
+  "metadata": {
+    "runId": "vector-harness-validation-001",
+    "startedAt": "2026-07-21T08:00:00Z",
+    "completedAt": "2026-07-21T08:00:01Z",
+    "harnessVersion": "0.1.0",
+    "browserFamily": null,
+    "platform": "test"
+  },
+  "timing": {
+    "pulseEmitMs": { "kind": "unsupported" },
+    "pulseDetectMs": { "kind": "unsupported" },
+    "loopbackLatencyMs": { "kind": "unsupported" },
+    "datachannelRttMs": { "kind": "unsupported" },
+    "iceGatheringMs": { "kind": "unsupported" },
+    "connectionSetupMs": { "kind": "unsupported" }
+  },
+  "syntheticPulse": {
+    "pulsesEmitted": { "kind": "unsupported" },
+    "pulsesDetected": { "kind": "unsupported" },
+    "detectionRate": { "kind": "unsupported" },
+    "meanDetectionLatencyMs": { "kind": "unsupported" },
+    "jitterMs": { "kind": "unsupported" }
+  },
+  "transport": {
+    "candidatePairType": { "kind": "unsupported" },
+    "bytesSent": { "kind": "unsupported" },
+    "bytesReceived": { "kind": "unsupported" },
+    "packetsLost": { "kind": "unsupported" }
+  }
+}

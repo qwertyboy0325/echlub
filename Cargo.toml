@@ -8,8 +8,10 @@ members = [
     "crates/echlub-replication",
     "crates/echlub-session",
     "crates/echlub-web",
+    "crates/echlub-performance",
     "apps/control-plane",
     "apps/protocol-lab",
+    "apps/performance-report",
 ]
 
 [workspace.package]
@@ -37,3 +39,4 @@ echlub-collaboration = { path = "crates/echlub-collaboration" }
 echlub-protocol = { path = "crates/echlub-protocol" }
 echlub-replication = { path = "crates/echlub-replication" }
 echlub-session = { path = "crates/echlub-session" }
+echlub-performance = { path = "crates/echlub-performance" }

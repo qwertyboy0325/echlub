@@ -8,6 +8,7 @@ Documented only — not implemented in foundation.
 - WebRTC media baseline
 - Local monitoring and instrumentation
 - No superiority claim
+- **Status**: implemented
 
 ## ECHLUB-COMPOSITION-INTENT-01
 
