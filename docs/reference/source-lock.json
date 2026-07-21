@@ -1,0 +1,34 @@
+{
+  "references": [
+    {
+      "repository": "qwertyboy0325/echlub-front",
+      "remote_url": "https://github.com/qwertyboy0325/echlub-front.git",
+      "path": ".reference/echlub-front",
+      "default_branch": "main",
+      "sha": "17d36ea7721bec7cb68460bb58c7e40ae9f9583c",
+      "fetched_at": "2026-07-21T07:52:00+00:00",
+      "read_only": true,
+      "clean": true
+    },
+    {
+      "repository": "qwertyboy0325/echlub_backend",
+      "remote_url": "https://github.com/qwertyboy0325/echlub_backend.git",
+      "path": ".reference/echlub_backend",
+      "default_branch": "main",
+      "sha": "b356fc2904bcf453c0109ffff3b70f480cafdccd",
+      "fetched_at": "2026-07-21T07:52:00+00:00",
+      "read_only": true,
+      "clean": true
+    },
+    {
+      "repository": "qwertyboy0325/vox-proof",
+      "remote_url": "https://github.com/qwertyboy0325/vox-proof.git",
+      "path": ".reference/vox-proof",
+      "default_branch": "main",
+      "sha": "17f62b6ea5b8908cc4ab32532ef7d72ce288cfbd",
+      "fetched_at": "2026-07-21T07:52:00+00:00",
+      "read_only": true,
+      "clean": true
+    }
+  ]
+}

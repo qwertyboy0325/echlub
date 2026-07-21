@@ -1,0 +1,9 @@
+[package]
+name = "echlub-session"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+echlub-model = { workspace = true }
+echlub-protocol = { workspace = true }
+serde = { workspace = true }

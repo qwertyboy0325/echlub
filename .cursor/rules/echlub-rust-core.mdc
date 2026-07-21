@@ -1,0 +1,13 @@
+---
+description: Rust core invariants
+globs: crates/**/*.rs,apps/control-plane/**/*.rs,apps/protocol-lab/**/*.rs
+---
+
+# EchLub Rust Core
+
+- Deterministic validation/apply/hash
+- Integer musical time only in canonical state
+- Typed errors/decisions; no panic on malformed input
+- No hidden I/O in core crates
+- No platform leakage (web-sys, axum in core crates)
+- Tests required for invariants

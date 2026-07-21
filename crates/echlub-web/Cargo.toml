@@ -1,0 +1,18 @@
+[package]
+name = "echlub-web"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+echlub-kernel = { workspace = true }
+echlub-model = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+echlub-model = { workspace = true }

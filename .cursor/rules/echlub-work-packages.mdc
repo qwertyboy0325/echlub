@@ -1,0 +1,14 @@
+---
+description: Bounded EchLub work packages
+alwaysApply: true
+---
+
+# EchLub Work Packages
+
+Use bounded packages with:
+
+- objective, risk_tier, file_scope, semantic_scope, claim_scope
+- authorized_scope, forbidden_scope, allowed_actions, forbidden_actions
+- required_checks, stop_gate, model_budget_policy
+
+Implementation completion is not approval. Diff and tests are authoritative.

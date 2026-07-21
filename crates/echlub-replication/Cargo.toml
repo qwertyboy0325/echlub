@@ -1,0 +1,14 @@
+[package]
+name = "echlub-replication"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+echlub-collaboration = { workspace = true }
+echlub-kernel = { workspace = true }
+echlub-model = { workspace = true }
+echlub-protocol = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+echlub-model = { workspace = true }

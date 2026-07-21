@@ -1,0 +1,16 @@
+[package]
+name = "echlub-protocol-lab"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "protocol-lab"
+path = "src/main.rs"
+
+[dependencies]
+echlub-collaboration = { workspace = true }
+echlub-kernel = { workspace = true }
+echlub-model = { workspace = true }
+echlub-replication = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

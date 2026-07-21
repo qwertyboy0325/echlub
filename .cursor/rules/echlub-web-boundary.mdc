@@ -1,0 +1,11 @@
+---
+description: Web presentation boundary
+globs: apps/web/**/*
+---
+
+# EchLub Web Boundary
+
+- React is a presentation shell
+- Domain mutations go through WASM `EchlubCore` only
+- No duplicated validation in TypeScript
+- No TypeScript fallback when WASM unavailable

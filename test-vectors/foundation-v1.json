@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "hash_version": 1,
+  "initial_document": {
+    "time_base": { "ticks_per_quarter": 480 },
+    "revision": 0,
+    "tracks": {}
+  },
+  "operations": [
+    {
+      "operation_id": 1,
+      "actor_id": 1,
+      "actor_sequence": 1,
+      "operation": { "type": "add_track", "track_id": 1, "name": "Drums" }
+    },
+    {
+      "operation_id": 2,
+      "actor_id": 1,
+      "actor_sequence": 2,
+      "operation": {
+        "type": "add_note",
+        "track_id": 1,
+        "note_id": 1,
+        "start": 0,
+        "duration": 480,
+        "pitch": 60,
+        "velocity": 100
+      }
+    },
+    {
+      "operation_id": 3,
+      "actor_id": 2,
+      "actor_sequence": 1,
+      "operation": {
+        "type": "add_note",
+        "track_id": 1,
+        "note_id": 2,
+        "start": 480,
+        "duration": 480,
+        "pitch": 64,
+        "velocity": 90
+      }
+    },
+    {
+      "operation_id": 3,
+      "actor_id": 2,
+      "actor_sequence": 1,
+      "operation": {
+        "type": "add_note",
+        "track_id": 1,
+        "note_id": 2,
+        "start": 480,
+        "duration": 480,
+        "pitch": 64,
+        "velocity": 90
+      }
+    },
+    {
+      "operation_id": 4,
+      "actor_id": 1,
+      "actor_sequence": 3,
+      "operation": {
+        "type": "move_note",
+        "note_id": 1,
+        "expected_revision": 1,
+        "new_start": 100
+      }
+    },
+    {
+      "operation_id": 5,
+      "actor_id": 2,
+      "actor_sequence": 2,
+      "operation": {
+        "type": "move_note",
+        "note_id": 1,
+        "expected_revision": 1,
+        "new_start": 200
+      }
+    },
+    {
+      "operation_id": 6,
+      "actor_id": 1,
+      "actor_sequence": 4,
+      "operation": {
+        "type": "move_note",
+        "note_id": 1,
+        "expected_revision": 1,
+        "new_start": 300
+      }
+    }
+  ],
+  "expected_decisions": [
+    "Accepted",
+    "Accepted",
+    "Accepted",
+    "Duplicate",
+    "Accepted",
+    "StaleRevision",
+    "StaleRevision"
+  ],
+  "expected_final_hash": "712fb8283edf1fc71bcab3671bd1cab4606cddaf5792629d5fb2127cc02bb177"
+}

@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/echlub-model",
+    "crates/echlub-kernel",
+    "crates/echlub-collaboration",
+    "crates/echlub-protocol",
+    "crates/echlub-replication",
+    "crates/echlub-session",
+    "crates/echlub-web",
+    "apps/control-plane",
+    "apps/protocol-lab",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+postcard = { version = "1", features = ["alloc"] }
+blake3 = "1"
+thiserror = "2"
+wasm-bindgen = "0.2"
+wasm-bindgen-test = "0.3"
+js-sys = "0.3"
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tower = "0.5"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+echlub-model = { path = "crates/echlub-model" }
+echlub-kernel = { path = "crates/echlub-kernel" }
+echlub-collaboration = { path = "crates/echlub-collaboration" }
+echlub-protocol = { path = "crates/echlub-protocol" }
+echlub-replication = { path = "crates/echlub-replication" }
+echlub-session = { path = "crates/echlub-session" }

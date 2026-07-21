@@ -1,0 +1,14 @@
+---
+description: EchLub architecture boundaries
+alwaysApply: true
+---
+
+# EchLub Architecture
+
+- Rust canonical semantic core
+- Performance and composition planes are distinct
+- Transport-independent protocol model
+- WebRTC is a future baseline adapter, not domain truth
+- Browser APIs do not enter core crates
+- No final transport selection in foundation
+- No production readiness claim

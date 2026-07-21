@@ -1,0 +1,14 @@
+---
+description: Read-only legacy reference sources
+alwaysApply: true
+globs: .reference/**
+---
+
+# EchLub Reference Sources
+
+When inspecting `.reference/**`:
+
+- No writes, installs, migrations, or formatting in reference clones
+- No build dependency on `.reference/**`
+- Record SHAs in `docs/reference/source-lock.json`
+- Run `scripts/check-references.py` before and after work

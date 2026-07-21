@@ -1,0 +1,10 @@
+[package]
+name = "echlub-collaboration"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+echlub-model = { workspace = true }
+
+[dev-dependencies]
+echlub-model = { workspace = true }

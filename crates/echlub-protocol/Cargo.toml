@@ -1,0 +1,9 @@
+[package]
+name = "echlub-protocol"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+echlub-model = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

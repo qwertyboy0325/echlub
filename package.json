@@ -1,0 +1,22 @@
+{
+  "name": "echlub",
+  "private": true,
+  "packageManager": "pnpm@10.12.4",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "wasm:build": "wasm-pack build crates/echlub-web --target web --out-dir pkg",
+    "wasm:test": "wasm-pack test --node crates/echlub-web",
+    "web:dev": "pnpm --filter @echlub/web dev",
+    "web:typecheck": "pnpm --filter @echlub/web typecheck",
+    "web:test": "pnpm --filter @echlub/web test",
+    "web:build": "pnpm wasm:build && pnpm --filter @echlub/web build",
+    "rust:fmt": "cargo fmt --all -- --check",
+    "rust:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
+    "rust:test": "cargo test --workspace --all-features",
+    "protocol:self-check": "cargo run -p echlub-protocol-lab --bin protocol-lab",
+    "references:check": "python3 scripts/check-references.py",
+    "verify": "python3 scripts/verify.py"
+  }
+}
