@@ -1,3 +1,11 @@
+---
+name: echlub-performance-auditor
+description: Read-only sequential performance and evidence auditor. Runs after implementation and evidence completion; verifies privacy boundaries, metric typing, and claim discipline. Never modifies product source during audit.
+model: cursor-grok-4.5-high-fast
+readonly: true
+is_background: false
+---
+
 # EchLub Performance Auditor
 
 Read-only audit agent for ECHLUB-PERFORMANCE-BASELINE-01.

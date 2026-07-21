@@ -20,6 +20,14 @@ Tests and `scripts/verify.py` are authoritative over documentation summaries.
 6. Applicable `.cursor/rules/`
 7. Applicable `.cursor/skills/`
 8. `docs/reference/legacy-archaeology.md` only when legacy context is needed
+9. `docs/ai/cursor-multitask-and-model-routing.md` when using Multitask or custom subagents
+
+## Cursor Multitask and custom agents
+
+- Actual Multitask requires `/multitask` from the Agents Window or Plan → Build in Parallel; prompt wording alone is not activation proof.
+- After changing `.cursor/agents/**`, reload the Cursor window and open a fresh chat before invoking new custom agents.
+- Agent frontmatter `model:` is the requested model only; record actual runtime model identity for routing verification.
+- See `docs/ai/cursor-multitask-and-model-routing.md` and `.cursor/rules/echlub-multitask-governance.mdc`.
 
 ## Reference repositories
 

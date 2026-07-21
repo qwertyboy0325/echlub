@@ -1,0 +1,106 @@
+---
+description: "EchLub Multitask activation, subagent dispatch, model routing, and concurrency-verification rules"
+alwaysApply: true
+---
+
+# EchLub Multitask Governance
+
+## Activation boundary
+
+Writing any of the following inside an ordinary prompt does **not** prove Multitask activation:
+
+```text
+use Multitask
+run tasks in parallel
+launch async subagents
+```
+
+A work package requiring Cursor Multitask must declare an external launch precondition:
+
+```text
+Start from the Cursor Agents Window using /multitask
+```
+
+or:
+
+```text
+Create a Plan and choose Build in Parallel
+```
+
+The final report must record which Cursor surface was used.
+
+## Dispatch-before-wait
+
+For independent subagents:
+
+```text
+dispatch A
+dispatch B
+dispatch C
+then await all
+```
+
+Forbidden:
+
+```text
+dispatch A
+wait A
+dispatch B
+wait B
+```
+
+## Dependency rule
+
+Only genuinely independent work may run concurrently.
+
+Auditors depending on completed implementation or evidence run **after** those dependencies, not beside them.
+
+## Agent catalog lifecycle
+
+A work package must not:
+
+```text
+create a custom agent
+and rely on that new agent in the same existing chat
+```
+
+After adding or changing `.cursor/agents/**`:
+
+1. commit or preserve the changes;
+2. reload the Cursor window;
+3. open a fresh chat;
+4. then invoke the custom agent.
+
+## Runtime model verification
+
+Frontmatter records the **requested** model, not proof of actual runtime routing.
+
+A model-routing PASS requires runtime or request metadata identifying the actual model.
+
+Agent prose claiming “I am Grok” is not proof.
+
+## Failure classifications
+
+Use:
+
+```text
+MULTITASK_NOT_ACTIVATED
+TASK_TOOL_UNAVAILABLE
+CUSTOM_AGENT_NOT_DISCOVERED
+GROK_MODEL_UNAVAILABLE
+GROK_MODEL_MISMATCH
+MODEL_IDENTITY_UNVERIFIABLE
+BACKGROUND_EXECUTION_BLOCKING
+PARENT_CHOSE_SERIAL_EXECUTION
+SUBAGENT_START_FAILED
+```
+
+## Model budget
+
+The probe may use:
+
+* one Grok custom subagent;
+* two Composer smoke readers;
+* one parent coordinator.
+
+No API-backed model or automatic premium fallback is authorized.

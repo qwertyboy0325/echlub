@@ -13,6 +13,10 @@
 - Repeated model sampling on the same writable task
 - Expensive models rerunning deterministic terminal commands
 
+## Bounded diagnostic exception
+
+Cursor-native Grok may be invoked once for `ECHLUB-CURSOR-MULTITASK-PROBE-01` to verify custom-agent routing. This does not authorize API-backed models, repeated sampling, implementation, or product review.
+
 ## Review date
 
 2026-08-11
