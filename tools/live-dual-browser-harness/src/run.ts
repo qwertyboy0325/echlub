@@ -23,6 +23,7 @@ import {
   removeTempUserDataDir,
   runConnectOrder,
   saveDownloads,
+  snapshotPeerDiagnostics,
   synchronizedObservationStart,
   type PeerSession,
 } from "./peer-runner.js";
