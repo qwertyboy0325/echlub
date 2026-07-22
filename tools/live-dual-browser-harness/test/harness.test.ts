@@ -118,9 +118,11 @@ describe("ready timeout and missing download guards", () => {
   it("fails when ready state is absent", async () => {
     const { waitForReady } = await import("../src/peer-runner.js");
     const page = {
-      getByText: () => ({
-        waitFor: vi.fn(async () => {
-          throw new Error("Timeout");
+      locator: () => ({
+        getByText: () => ({
+          waitFor: vi.fn(async () => {
+            throw new Error("Timeout");
+          }),
         }),
       }),
     };
