@@ -14,3 +14,10 @@ pub fn app() -> Router {
         .route("/v1/signaling/ws", get(signaling::signaling_ws_handler))
         .with_state(signaling_state)
 }
+
+#[cfg(test)]
+pub(crate) mod test_env {
+    use std::sync::Mutex;
+
+    pub static LOCK: Mutex<()> = Mutex::new(());
+}

@@ -23,10 +23,7 @@ impl ControlPlaneConfig {
     }
 }
 
-fn parse_allowed_origins() -> Result<Vec<String>, String> {
-    let Ok(raw) = std::env::var("ECHLUB_ALLOWED_ORIGINS") else {
-        return Ok(vec![]);
-    };
+pub(crate) fn parse_allowed_origins_from_raw(raw: &str) -> Result<Vec<String>, String> {
     if raw.trim().is_empty() {
         return Err("ECHLUB_ALLOWED_ORIGINS must not be empty when set".into());
     }
@@ -49,6 +46,13 @@ fn parse_allowed_origins() -> Result<Vec<String>, String> {
     origins.sort();
     origins.dedup();
     Ok(origins)
+}
+
+fn parse_allowed_origins() -> Result<Vec<String>, String> {
+    let Ok(raw) = std::env::var("ECHLUB_ALLOWED_ORIGINS") else {
+        return Ok(vec![]);
+    };
+    parse_allowed_origins_from_raw(&raw)
 }
 
 pub fn is_valid_origin(origin: &str) -> bool {
@@ -84,26 +88,21 @@ pub fn validate_origin(origin: &str, extra_origins: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
-
-    static ENV_TEST_LOCK: Mutex<()> = Mutex::new(());
+    use crate::test_env;
 
     #[test]
     fn rejects_wildcard_config() {
-        let _lock = ENV_TEST_LOCK.lock().unwrap();
-        let key = "ECHLUB_ALLOWED_ORIGINS";
-        let previous = std::env::var(key).ok();
-        std::env::set_var(key, "http://*");
-        assert!(parse_allowed_origins().is_err());
-        match previous {
-            Some(val) => std::env::set_var(key, val),
-            None => std::env::remove_var(key),
-        }
+        assert!(parse_allowed_origins_from_raw("http://*").is_err());
+    }
+
+    #[test]
+    fn rejects_empty_allowed_origins_when_set() {
+        assert!(parse_allowed_origins_from_raw("   ").is_err());
     }
 
     #[test]
     fn default_bind_is_loopback() {
-        let _lock = ENV_TEST_LOCK.lock().unwrap();
+        let _lock = test_env::LOCK.lock().unwrap();
         let key = "ECHLUB_ALLOWED_ORIGINS";
         let previous = std::env::var(key).ok();
         std::env::remove_var(key);

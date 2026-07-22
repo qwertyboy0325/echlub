@@ -45,15 +45,13 @@ pub async fn capabilities() -> Json<CapabilitiesResponse> {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_env;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
-    use std::sync::Mutex;
     use tower::ServiceExt;
 
-    static ENV_TEST_LOCK: Mutex<()> = Mutex::new(());
-
     fn test_app() -> axum::Router {
-        let _lock = ENV_TEST_LOCK.lock().unwrap();
+        let _lock = test_env::LOCK.lock().unwrap();
         std::env::remove_var("ECHLUB_ALLOWED_ORIGINS");
         crate::app()
     }
