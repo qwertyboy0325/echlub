@@ -63,10 +63,10 @@ export async function launchPeer(config: PeerConfig): Promise<PeerSession> {
 async function configurePeer(page: Page, config: PeerConfig): Promise<void> {
   const panel = page.locator("section.performance-panel");
   await panel.getByRole("heading", { name: /Live Two-Peer Observation/i }).waitFor({ timeout: 60_000 });
-  await panel.getByLabel(/Session correlation ID/i).fill(config.correlationId);
-  await panel.getByLabel(/^Role$/i).selectOption(config.role);
-  await panel.getByLabel(/Signaling URL/i).fill(SIGNALING_URL);
-  await panel.getByLabel(/Capture profile/i).selectOption("browser_default");
+  await panel.locator("label").filter({ hasText: "Session correlation ID" }).locator("input").fill(config.correlationId);
+  await panel.locator("label").filter({ hasText: /^Role$/ }).locator("select").selectOption(config.role);
+  await panel.locator("label").filter({ hasText: "Signaling URL" }).locator("input").fill(SIGNALING_URL);
+  await panel.locator("label").filter({ hasText: "Capture profile" }).locator("select").selectOption("browser_default");
   await panel.getByRole("checkbox").check();
   await panel.getByRole("button", { name: /^Prepare$/i }).click();
   await panel.getByRole("button", { name: /Enable Microphone/i }).click();
