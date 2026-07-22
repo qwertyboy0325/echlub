@@ -1,19 +1,26 @@
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 import { generateCorrelationId } from "../src/constants.js";
+import { calculateActualEndpointStartDeltaMs } from "../src/endpoint-timing.js";
 import {
   assertSafeAutomationOutputPath,
-  automationLayout,
   OWNER_IMPORT_ROOT,
   resolveAutomationRunDir,
+  scenarioLayout,
 } from "../src/paths.js";
-import { buildAutomationReport, classificationNeverClaimsPhysical } from "../src/report.js";
+import {
+  buildAutomationReport,
+  classificationNeverClaimsPhysical,
+  createScenarioReport,
+  overallPassRequiresAllScenarios,
+  scenarioMayPass,
+} from "../src/report.js";
 import { FAKE_AUDIO_PEER_A, FAKE_AUDIO_PEER_B } from "../src/constants.js";
 import { createTempUserDataDir, removeTempUserDataDir } from "../src/peer-runner.js";
 import { ProcessManager } from "../src/process-manager.js";
-import { validateLiveEndpoint } from "../src/validation.js";
+import { assertFinalizedDownloadsExist, validateLiveEndpoint } from "../src/validation.js";
 import { join } from "node:path";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 
 describe("automation output path guard", () => {
   it("rejects owner import directory targets", () => {
@@ -29,7 +36,47 @@ describe("automation output path guard", () => {
   it("accepts automation run directories", () => {
     const runDir = resolveAutomationRunDir("test-run");
     expect(() => assertSafeAutomationOutputPath(runDir)).not.toThrow();
-    expect(automationLayout(runDir).peerAJson).toContain("raw/peer-a.json");
+    const scenario = scenarioLayout(runDir, "peer_a_first");
+    expect(scenario.peerAJson).toContain("scenarios/peer-a-first/raw/peer-a.json");
+  });
+});
+
+describe("per-scenario output isolation", () => {
+  it("uses disjoint paths for peer_a_first and peer_b_first", () => {
+    const runDir = resolveAutomationRunDir("isolation-test");
+    const peerAFirst = scenarioLayout(runDir, "peer_a_first");
+    const peerBFirst = scenarioLayout(runDir, "peer_b_first");
+    expect(peerAFirst.scenarioDir).not.toBe(peerBFirst.scenarioDir);
+    expect(peerAFirst.rawDir).not.toBe(peerBFirst.rawDir);
+    expect(peerAFirst.pairedDir).not.toBe(peerBFirst.pairedDir);
+    expect(peerAFirst.diagnosticsDir).not.toBe(peerBFirst.diagnosticsDir);
+    expect(peerAFirst.peerAJson).not.toBe(peerBFirst.peerAJson);
+    expect(peerAFirst.peerBJson).not.toBe(peerBFirst.peerBJson);
+  });
+
+  it("retains scenario A artifacts when scenario B layout is created", () => {
+    const runDir = resolveAutomationRunDir(`isolation-retention-${Date.now()}`);
+    try {
+      const peerAFirst = scenarioLayout(runDir, "peer_a_first");
+      const peerBFirst = scenarioLayout(runDir, "peer_b_first");
+      mkdirSync(peerAFirst.rawDir, { recursive: true });
+      writeFileSync(peerAFirst.peerAJson, '{"scenario":"peer-a-first"}\n', "utf8");
+      writeFileSync(peerAFirst.peerBJson, '{"scenario":"peer-a-first-b"}\n', "utf8");
+      expect(peerBFirst.scenarioDir).not.toBe(peerAFirst.scenarioDir);
+      expect(peerAFirst.peerAJson).toContain("peer-a-first");
+      expect(peerBFirst.peerAJson).toContain("peer-b-first");
+      expect(() => readFileSync(peerAFirst.peerAJson, "utf8")).not.toThrow();
+    } finally {
+      rmSync(runDir, { recursive: true, force: true });
+    }
+  });
+
+  it("retains separate diagnostics directories", () => {
+    const runDir = resolveAutomationRunDir("diag-isolation");
+    const peerAFirst = scenarioLayout(runDir, "peer_a_first");
+    const peerBFirst = scenarioLayout(runDir, "peer_b_first");
+    expect(peerAFirst.diagnosticsDir.endsWith("peer-a-first/diagnostics")).toBe(true);
+    expect(peerBFirst.diagnosticsDir.endsWith("peer-b-first/diagnostics")).toBe(true);
   });
 });
 
@@ -76,6 +123,37 @@ describe("classification boundary", () => {
     expect(classificationNeverClaimsPhysical(report)).toBe(true);
     expect(report.physicalTwoDeviceObservationSatisfied).toBe(false);
     expect(report.evidenceAuthority).toBe("readiness_only");
+    expect(report.allRequiredScenariosPassed).toBe(false);
+  });
+});
+
+describe("scenario pass gate", () => {
+  it("cannot PASS before validation, pairing, and verify", () => {
+    const report = createScenarioReport("peer_a_first", "/tmp/scenario");
+    expect(scenarioMayPass(report)).toBe(false);
+    expect(report.result).toBe("FAILED");
+  });
+
+  it("requires all validation steps before PASS", () => {
+    const report = createScenarioReport("peer_a_first", "/tmp/scenario");
+    report.readyReached = true;
+    report.completedReached = true;
+    report.finalizedDownloads = "PASS";
+    report.peerAEndpointValidation = "PASS";
+    report.peerBEndpointValidation = "PASS";
+    report.pairing = "PASS";
+    report.directoryVerification = "PASS";
+    report.uiClickDispatchDeltaMs = 12;
+    report.actualEndpointStartDeltaMs = 34;
+    expect(scenarioMayPass(report)).toBe(true);
+  });
+
+  it("overall PASS requires both scenarios", () => {
+    const pass = createScenarioReport("peer_a_first", "/a");
+    pass.result = "PASS";
+    const fail = createScenarioReport("peer_b_first", "/b");
+    expect(overallPassRequiresAllScenarios([pass])).toBe(true);
+    expect(overallPassRequiresAllScenarios([pass, fail])).toBe(false);
   });
 });
 
@@ -105,16 +183,23 @@ describe("validation failures", () => {
 });
 
 describe("process cleanup", () => {
-  it("tracks spawned children for termination", () => {
-    const log = mkdtempSync(join(tmpdir(), "echlub-process-log-"));
-    const manager = new ProcessManager(join(log, "process-log.txt"));
-    const child = manager.start("echo-test", "echo", ["ok"]);
-    expect(manager.trackedChildren).toContain(child);
-    manager.terminateAll();
-  });
+  it(
+    "waits for actual child exit after SIGTERM",
+    async () => {
+      const logDir = mkdtempSync(join(tmpdir(), "echlub-process-log-"));
+      const manager = new ProcessManager(join(logDir, "process-log.txt"));
+      manager.start("sleeper", "sleep", ["30"]);
+      await manager.terminateAllAndWait(5_000);
+      expect(manager.trackedChildren.every((child) => child.signalCode !== null || child.exitCode !== null)).toBe(
+        true,
+      );
+      rmSync(logDir, { recursive: true, force: true });
+    },
+    10_000,
+  );
 });
 
-describe("ready timeout and missing download guards", () => {
+describe("ready timeout guards", () => {
   it("fails when ready state is absent", async () => {
     const { waitForReady } = await import("../src/peer-runner.js");
     const page = {
@@ -128,11 +213,96 @@ describe("ready timeout and missing download guards", () => {
     };
     await expect(waitForReady(page as never, 10)).rejects.toThrow(/Timeout/);
   });
+});
 
-  it("fails when download path is missing before validation", () => {
-    const missing = join(tmpdir(), "missing-peer-a.json");
-    expect(() => {
-      if (!missing.endsWith(".json")) throw new Error("missing finalized endpoint downloads");
-    }).not.toThrow();
+describe("finalized download guards", () => {
+  it("fails when expected endpoint path is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "echlub-missing-download-"));
+    const existing = join(dir, "peer-b.json");
+    const missing = join(dir, "peer-a.json");
+    writeFileSync(existing, "{}\n", "utf8");
+    try {
+      expect(() => assertFinalizedDownloadsExist(missing, existing)).toThrow(
+        /missing finalized endpoint download/,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("proceeds to validator when endpoint paths exist", () => {
+    const dir = mkdtempSync(join(tmpdir(), "echlub-existing-download-"));
+    const path = join(dir, "peer-a.json");
+    writeFileSync(path, JSON.stringify({ exportKind: "draft" }), "utf8");
+    try {
+      expect(() => assertFinalizedDownloadsExist(path, path)).not.toThrow();
+      expect(() => validateLiveEndpoint(path)).toThrow(/validate-live-endpoint failed/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("actual endpoint start delta", () => {
+  function writeEndpoint(dir: string, name: string, startedAtUtc: string): string {
+    const path = join(dir, name);
+    writeFileSync(path, `${JSON.stringify({ startedAtUtc })}\n`, "utf8");
+    return path;
+  }
+
+  it("passes for 0 ms delta", () => {
+    const dir = mkdtempSync(join(tmpdir(), "echlub-start-delta-"));
+    try {
+      const peerA = writeEndpoint(dir, "peer-a.json", "2026-07-22T05:00:00.000Z");
+      const peerB = writeEndpoint(dir, "peer-b.json", "2026-07-22T05:00:00.000Z");
+      expect(calculateActualEndpointStartDeltaMs(peerA, peerB)).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("passes for 1999 ms delta", () => {
+    const dir = mkdtempSync(join(tmpdir(), "echlub-start-delta-"));
+    try {
+      const peerA = writeEndpoint(dir, "peer-a.json", "2026-07-22T05:00:00.000Z");
+      const peerB = writeEndpoint(dir, "peer-b.json", "2026-07-22T05:00:01.999Z");
+      expect(calculateActualEndpointStartDeltaMs(peerA, peerB)).toBe(1999);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails for 2001 ms delta", () => {
+    const dir = mkdtempSync(join(tmpdir(), "echlub-start-delta-"));
+    try {
+      const peerA = writeEndpoint(dir, "peer-a.json", "2026-07-22T05:00:00.000Z");
+      const peerB = writeEndpoint(dir, "peer-b.json", "2026-07-22T05:00:02.001Z");
+      expect(() => calculateActualEndpointStartDeltaMs(peerA, peerB)).toThrow(/exceeds 2000ms/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when startedAtUtc is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "echlub-start-delta-"));
+    try {
+      const peerA = join(dir, "peer-a.json");
+      const peerB = writeEndpoint(dir, "peer-b.json", "2026-07-22T05:00:00.000Z");
+      writeFileSync(peerA, "{}\n", "utf8");
+      expect(() => calculateActualEndpointStartDeltaMs(peerA, peerB)).toThrow(/missing startedAtUtc/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when startedAtUtc is invalid", () => {
+    const dir = mkdtempSync(join(tmpdir(), "echlub-start-delta-"));
+    try {
+      const peerA = writeEndpoint(dir, "peer-a.json", "not-a-date");
+      const peerB = writeEndpoint(dir, "peer-b.json", "2026-07-22T05:00:00.000Z");
+      expect(() => calculateActualEndpointStartDeltaMs(peerA, peerB)).toThrow(/invalid startedAtUtc/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -1,11 +1,20 @@
 import { AUTOMATION_SCHEMA_VERSION, type AutomationResult, type ConnectOrder } from "./constants.js";
 
+export type StepResult = "PASS" | "FAILED" | "SKIPPED";
+
 export interface ScenarioReport {
   connectOrder: ConnectOrder;
   result: AutomationResult;
   readyReached: boolean;
   completedReached: boolean;
-  observationStartDeltaMs: number | null;
+  finalizedDownloads: StepResult;
+  peerAEndpointValidation: StepResult;
+  peerBEndpointValidation: StepResult;
+  pairing: StepResult;
+  directoryVerification: StepResult;
+  uiClickDispatchDeltaMs: number | null;
+  actualEndpointStartDeltaMs: number | null;
+  outputDirectory: string;
   error: string | null;
 }
 
@@ -14,6 +23,7 @@ export interface AutomationReport {
   classification: "automated_single_host_dual_browser";
   evidenceAuthority: "readiness_only";
   physicalTwoDeviceObservationSatisfied: false;
+  allRequiredScenariosPassed: boolean;
   sameHost: true;
   separateBrowserProcesses: true;
   fakeMicrophones: true;
@@ -28,6 +38,27 @@ export interface AutomationReport {
   notes: string[];
 }
 
+export function createScenarioReport(
+  order: ConnectOrder,
+  outputDirectory: string,
+): ScenarioReport {
+  return {
+    connectOrder: order,
+    result: "FAILED",
+    readyReached: false,
+    completedReached: false,
+    finalizedDownloads: "SKIPPED",
+    peerAEndpointValidation: "SKIPPED",
+    peerBEndpointValidation: "SKIPPED",
+    pairing: "SKIPPED",
+    directoryVerification: "SKIPPED",
+    uiClickDispatchDeltaMs: null,
+    actualEndpointStartDeltaMs: null,
+    outputDirectory,
+    error: null,
+  };
+}
+
 export function buildAutomationReport(input: {
   authorizedCommit: string;
   result: AutomationResult;
@@ -35,11 +66,14 @@ export function buildAutomationReport(input: {
   observationSeconds: number;
   notes?: string[];
 }): AutomationReport {
+  const allRequiredScenariosPassed =
+    input.scenarios.length > 0 && input.scenarios.every((scenario) => scenario.result === "PASS");
   return {
     schemaVersion: AUTOMATION_SCHEMA_VERSION,
     classification: "automated_single_host_dual_browser",
     evidenceAuthority: "readiness_only",
     physicalTwoDeviceObservationSatisfied: false,
+    allRequiredScenariosPassed,
     sameHost: true,
     separateBrowserProcesses: true,
     fakeMicrophones: true,
@@ -66,5 +100,23 @@ export function classificationNeverClaimsPhysical(report: AutomationReport): boo
     report.independentHardwareClocksProven === false &&
     report.acousticLatencyMeasured === false &&
     report.classification === "automated_single_host_dual_browser"
+  );
+}
+
+export function overallPassRequiresAllScenarios(scenarios: ScenarioReport[]): boolean {
+  return scenarios.length > 0 && scenarios.every((scenario) => scenario.result === "PASS");
+}
+
+export function scenarioMayPass(report: ScenarioReport): boolean {
+  return (
+    report.readyReached &&
+    report.completedReached &&
+    report.finalizedDownloads === "PASS" &&
+    report.peerAEndpointValidation === "PASS" &&
+    report.peerBEndpointValidation === "PASS" &&
+    report.pairing === "PASS" &&
+    report.directoryVerification === "PASS" &&
+    report.uiClickDispatchDeltaMs !== null &&
+    report.actualEndpointStartDeltaMs !== null
   );
 }

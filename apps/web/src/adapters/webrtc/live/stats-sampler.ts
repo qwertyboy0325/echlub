@@ -155,6 +155,8 @@ export async function collectNormalizedStats(
     }
   }
 
+  applyCandidatePairAudioFallback(inboundAudio, outboundAudio, candidatePair);
+
   const sample: NormalizedStatsSample = {
     offsetMs,
     candidatePair,
@@ -168,8 +170,16 @@ export async function collectNormalizedStats(
     sample.intervalMetrics = computeIntervalMetrics(prev, sample);
   }
 
+  return sample;
+}
+
+export function applyCandidatePairAudioFallback(
+  inboundAudio: Record<string, MetricValue>,
+  outboundAudio: Record<string, MetricValue>,
+  candidatePair: Record<string, MetricValue>,
+): void {
   if (!("packetsReceived" in inboundAudio) && candidatePair.packetsReceived) {
-    inboundAudio = {
+    Object.assign(inboundAudio, {
       packetsReceived: candidatePair.packetsReceived,
       bytesReceived: candidatePair.bytesReceived ?? unsupported(),
       packetsLost: unsupported(),
@@ -180,21 +190,16 @@ export async function collectNormalizedStats(
       concealedSamples: unsupported(),
       totalSamplesReceived: unsupported(),
       audioLevel: unsupported(),
-    };
+    });
   }
   if (!("packetsSent" in outboundAudio) && candidatePair.packetsSent) {
-    outboundAudio = {
+    Object.assign(outboundAudio, {
       packetsSent: candidatePair.packetsSent,
       bytesSent: candidatePair.bytesSent ?? unsupported(),
       retransmittedPacketsSent: unsupported(),
       audioLevel: unsupported(),
-    };
+    });
   }
-
-  sample.inboundAudio = inboundAudio;
-  sample.outboundAudio = outboundAudio;
-
-  return sample;
 }
 
 export async function collectStatsPreflight(

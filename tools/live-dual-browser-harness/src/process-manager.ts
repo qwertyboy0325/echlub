@@ -8,6 +8,7 @@ export function resolveAuthorizedCommit(): string {
 
 export class ProcessManager {
   private readonly children: ChildProcess[] = [];
+  private readonly exited = new Set<ChildProcess>();
   private readonly logPath: string;
 
   constructor(logPath: string) {
@@ -37,6 +38,9 @@ export class ProcessManager {
     child.on("exit", (code, signal) => {
       this.log(name, `exit code=${code ?? "null"} signal=${signal ?? "null"}\n`);
     });
+    child.once("close", () => {
+      this.exited.add(child);
+    });
     this.children.push(child);
     return child;
   }
@@ -54,7 +58,7 @@ export class ProcessManager {
 
   terminateAll(): void {
     for (const child of this.children) {
-      if (child.exitCode === null && !child.killed) {
+      if (!this.exited.has(child)) {
         child.kill("SIGTERM");
       }
     }
@@ -62,22 +66,47 @@ export class ProcessManager {
 
   async terminateAllAndWait(timeoutMs = 5_000): Promise<void> {
     this.terminateAll();
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      if (this.children.every((child) => child.exitCode !== null || child.killed)) {
-        return;
-      }
-      await sleep(100);
-    }
+    await this.waitForActualExit(timeoutMs);
+
     for (const child of this.children) {
-      if (child.exitCode === null && !child.killed) {
+      if (!this.exited.has(child)) {
         child.kill("SIGKILL");
       }
+    }
+
+    await this.waitForActualExit(2_000);
+
+    const survivors = this.children.filter((child) => !this.exited.has(child));
+    if (survivors.length > 0) {
+      throw new Error(`process cleanup failed: ${survivors.length} child process(es) still running`);
     }
   }
 
   get trackedChildren(): ChildProcess[] {
     return [...this.children];
+  }
+
+  private async waitForActualExit(timeoutMs: number): Promise<void> {
+    const pending = this.children.filter((child) => !this.exited.has(child));
+    if (pending.length === 0) {
+      return;
+    }
+
+    await Promise.race([
+      Promise.all(
+        pending.map(
+          (child) =>
+            new Promise<void>((resolve) => {
+              if (this.exited.has(child)) {
+                resolve();
+                return;
+              }
+              child.once("close", () => resolve());
+            }),
+        ),
+      ),
+      sleep(timeoutMs),
+    ]);
   }
 
   private log(name: string, message: string): void {

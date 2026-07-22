@@ -1,4 +1,3 @@
-import { copyFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   ensureDir,
@@ -10,7 +9,8 @@ import {
   type ConnectOrder,
   type PeerDiagnostics,
 } from "./constants.js";
-import { automationLayout, resolveAutomationRunDir } from "./paths.js";
+import { calculateActualEndpointStartDeltaMs } from "./endpoint-timing.js";
+import { resolveAutomationRunDir, runLayout, scenarioLayout } from "./paths.js";
 import {
   assertEndpointNegotiationRoles,
   assertObservationStartWindow,
@@ -27,92 +27,19 @@ import {
   type PeerSession,
 } from "./peer-runner.js";
 import { ProcessManager } from "./process-manager.js";
-import { buildAutomationReport, type ScenarioReport } from "./report.js";
+import {
+  buildAutomationReport,
+  createScenarioReport,
+  scenarioMayPass,
+  type ScenarioReport,
+} from "./report.js";
 import { ensureFakeAudioFixtures } from "./wav.js";
-import { pairLiveEndpoints, validateLiveEndpoint, verifyLiveDirectory } from "./validation.js";
-
-async function runScenario(options: {
-  order: ConnectOrder;
-  correlationId: string;
-  fakeAudio: { peerA: string; peerB: string };
-  layout: ReturnType<typeof automationLayout>;
-}): Promise<{ scenario: ScenarioReport; peerADiagnostics: PeerDiagnostics; peerBDiagnostics: PeerDiagnostics }> {
-  const userDataA = createTempUserDataDir("echlub-live-a-");
-  const userDataB = createTempUserDataDir("echlub-live-b-");
-  if (userDataA === userDataB) {
-    throw new Error("peer browser user-data directories must be distinct");
-  }
-
-  let peerA: PeerSession | null = null;
-  let peerB: PeerSession | null = null;
-  try {
-    peerA = await launchPeer({
-      role: "peer_a",
-      correlationId: options.correlationId,
-      fakeAudioPath: options.fakeAudio.peerA,
-      userDataDir: userDataA,
-      diagnosticsDir: options.layout.diagnosticsDir,
-    });
-    peerB = await launchPeer({
-      role: "peer_b",
-      correlationId: options.correlationId,
-      fakeAudioPath: options.fakeAudio.peerB,
-      userDataDir: userDataB,
-      diagnosticsDir: options.layout.diagnosticsDir,
-    });
-
-    await runConnectOrder(options.order, peerA, peerB);
-    await assertPeerReadyStates(peerA, peerB);
-    const observationStartDeltaMs = await synchronizedObservationStart(peerA, peerB);
-    assertObservationStartWindow(observationStartDeltaMs, OBSERVATION_START_WINDOW_MS);
-    await assertPeerCompletedStates(peerA, peerB);
-    await saveDownloads(peerA, peerB, options.layout.peerAJson, options.layout.peerBJson);
-    assertEndpointNegotiationRoles(options.layout.peerAJson, options.layout.peerBJson);
-
-    const peerADiagnostics = await capturePeerArtifacts(peerA, options.layout.diagnosticsDir, "peer-a");
-    const peerBDiagnostics = await capturePeerArtifacts(peerB, options.layout.diagnosticsDir, "peer-b");
-
-    return {
-      scenario: {
-        connectOrder: options.order,
-        result: "PASS",
-        readyReached: true,
-        completedReached: true,
-        observationStartDeltaMs,
-        error: null,
-      },
-      peerADiagnostics,
-      peerBDiagnostics,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const peerADiagnostics =
-      peerA !== null
-        ? await capturePeerArtifacts(peerA, options.layout.diagnosticsDir, "peer-a")
-        : emptyDiagnostics(message);
-    const peerBDiagnostics =
-      peerB !== null
-        ? await capturePeerArtifacts(peerB, options.layout.diagnosticsDir, "peer-b")
-        : emptyDiagnostics(message);
-    return {
-      scenario: {
-        connectOrder: options.order,
-        result: "FAILED",
-        readyReached: false,
-        completedReached: false,
-        observationStartDeltaMs: null,
-        error: message,
-      },
-      peerADiagnostics,
-      peerBDiagnostics,
-    };
-  } finally {
-    if (peerA) await closePeer(peerA);
-    if (peerB) await closePeer(peerB);
-    removeTempUserDataDir(userDataA);
-    removeTempUserDataDir(userDataB);
-  }
-}
+import {
+  assertFinalizedDownloadsExist,
+  pairLiveEndpoints,
+  validateLiveEndpoint,
+  verifyLiveDirectory,
+} from "./validation.js";
 
 function emptyDiagnostics(error: string): PeerDiagnostics {
   return {
@@ -128,41 +55,163 @@ function emptyDiagnostics(error: string): PeerDiagnostics {
   };
 }
 
-function writeDiagnosticsBundle(
-  diagnosticsDir: string,
-  scenarios: Array<{
-    order: ConnectOrder;
-    peerA: PeerDiagnostics;
-    peerB: PeerDiagnostics;
-  }>,
-): void {
-  writeJson(join(diagnosticsDir, "browser-console.json"), scenarios);
-  const peerATrace = join(diagnosticsDir, "peer-a-trace.zip");
-  const combinedTrace = join(diagnosticsDir, "playwright-trace.zip");
-  if (existsSync(peerATrace)) {
-    copyFileSync(peerATrace, combinedTrace);
+function markStepFailed(report: ScenarioReport, step: keyof Pick<
+  ScenarioReport,
+  | "finalizedDownloads"
+  | "peerAEndpointValidation"
+  | "peerBEndpointValidation"
+  | "pairing"
+  | "directoryVerification"
+>): void {
+  if (report[step] === "SKIPPED") {
+    report[step] = "FAILED";
   }
+}
+
+async function writeScenarioDiagnostics(
+  layout: ReturnType<typeof scenarioLayout>,
+  runProcessLog: string,
+  peerA: PeerDiagnostics,
+  peerB: PeerDiagnostics,
+): Promise<void> {
+  writeJson(join(layout.diagnosticsDir, "browser-console.json"), {
+    connectOrder: layout.order,
+    peerA,
+    peerB,
+  });
+  writeJson(join(layout.diagnosticsDir, "process-log-reference.json"), {
+    processLog: runProcessLog,
+  });
+}
+
+async function runScenario(options: {
+  order: ConnectOrder;
+  correlationId: string;
+  fakeAudio: { peerA: string; peerB: string };
+  runDir: string;
+  runProcessLog: string;
+}): Promise<ScenarioReport> {
+  const layout = scenarioLayout(options.runDir, options.order);
+  ensureDir(layout.rawDir);
+  ensureDir(layout.pairedDir);
+  ensureDir(layout.diagnosticsDir);
+
+  const report = createScenarioReport(options.order, layout.scenarioDir);
+  const userDataA = createTempUserDataDir("echlub-live-a-");
+  const userDataB = createTempUserDataDir("echlub-live-b-");
+  if (userDataA === userDataB) {
+    report.error = "peer browser user-data directories must be distinct";
+    return report;
+  }
+
+  let peerA: PeerSession | null = null;
+  let peerB: PeerSession | null = null;
+  let peerADiagnostics = emptyDiagnostics("peer A not launched");
+  let peerBDiagnostics = emptyDiagnostics("peer B not launched");
+
+  try {
+    peerA = await launchPeer({
+      role: "peer_a",
+      correlationId: options.correlationId,
+      fakeAudioPath: options.fakeAudio.peerA,
+      userDataDir: userDataA,
+      diagnosticsDir: layout.diagnosticsDir,
+    });
+    peerB = await launchPeer({
+      role: "peer_b",
+      correlationId: options.correlationId,
+      fakeAudioPath: options.fakeAudio.peerB,
+      userDataDir: userDataB,
+      diagnosticsDir: layout.diagnosticsDir,
+    });
+
+    await runConnectOrder(options.order, peerA, peerB);
+    await assertPeerReadyStates(peerA, peerB);
+    report.readyReached = true;
+
+    const uiClickDispatchDeltaMs = await synchronizedObservationStart(peerA, peerB);
+    assertObservationStartWindow(uiClickDispatchDeltaMs, OBSERVATION_START_WINDOW_MS);
+    report.uiClickDispatchDeltaMs = uiClickDispatchDeltaMs;
+
+    await assertPeerCompletedStates(peerA, peerB);
+    report.completedReached = true;
+
+    await saveDownloads(peerA, peerB, layout.peerAJson, layout.peerBJson);
+    assertFinalizedDownloadsExist(layout.peerAJson, layout.peerBJson);
+    report.finalizedDownloads = "PASS";
+
+    assertEndpointNegotiationRoles(layout.peerAJson, layout.peerBJson);
+
+    report.actualEndpointStartDeltaMs = calculateActualEndpointStartDeltaMs(
+      layout.peerAJson,
+      layout.peerBJson,
+    );
+
+    validateLiveEndpoint(layout.peerAJson);
+    report.peerAEndpointValidation = "PASS";
+    validateLiveEndpoint(layout.peerBJson);
+    report.peerBEndpointValidation = "PASS";
+
+    pairLiveEndpoints(layout.peerAJson, layout.peerBJson, layout.pairedDir);
+    report.pairing = "PASS";
+
+    verifyLiveDirectory(layout.pairedDir);
+    report.directoryVerification = "PASS";
+
+    if (!scenarioMayPass(report)) {
+      throw new Error("scenario gate incomplete despite successful validation steps");
+    }
+    report.result = "PASS";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    report.error = message;
+    report.result = "FAILED";
+
+    if (report.completedReached && report.finalizedDownloads === "SKIPPED") {
+      report.finalizedDownloads = "FAILED";
+    }
+    if (report.finalizedDownloads === "PASS" && report.peerAEndpointValidation === "SKIPPED") {
+      markStepFailed(report, "peerAEndpointValidation");
+    }
+    if (report.peerAEndpointValidation === "PASS" && report.peerBEndpointValidation === "SKIPPED") {
+      markStepFailed(report, "peerBEndpointValidation");
+    }
+    if (report.peerBEndpointValidation === "PASS" && report.pairing === "SKIPPED") {
+      markStepFailed(report, "pairing");
+    }
+    if (report.pairing === "PASS" && report.directoryVerification === "SKIPPED") {
+      markStepFailed(report, "directoryVerification");
+    }
+  } finally {
+    if (peerA !== null) {
+      peerADiagnostics = await capturePeerArtifacts(peerA, layout.diagnosticsDir, "peer-a");
+      await closePeer(peerA);
+    }
+    if (peerB !== null) {
+      peerBDiagnostics = await capturePeerArtifacts(peerB, layout.diagnosticsDir, "peer-b");
+      await closePeer(peerB);
+    }
+    removeTempUserDataDir(userDataA);
+    removeTempUserDataDir(userDataB);
+    await writeScenarioDiagnostics(layout, options.runProcessLog, peerADiagnostics, peerBDiagnostics);
+  }
+
+  return report;
 }
 
 async function main(): Promise<number> {
   const runId = generateAutomationRunId();
-  const layout = automationLayout(resolveAutomationRunDir(runId));
+  const layout = runLayout(resolveAutomationRunDir(runId));
   ensureDir(layout.runDir);
-  ensureDir(layout.rawDir);
-  ensureDir(layout.pairedDir);
+  ensureDir(layout.scenariosDir);
   ensureDir(layout.diagnosticsDir);
-  const processLog = join(layout.diagnosticsDir, "process-log.txt");
-  const processes = new ProcessManager(processLog);
 
+  const processes = new ProcessManager(layout.processLog);
   const fakeAudio = ensureFakeAudioFixtures();
   const scenarios: ScenarioReport[] = [];
-  const diagnosticsBundle: Array<{
-    order: ConnectOrder;
-    peerA: PeerDiagnostics;
-    peerB: PeerDiagnostics;
-  }> = [];
   let finalResult: "PASS" | "FAILED" = "PASS";
   let failureMessage: string | null = null;
+  let cleanupFailed = false;
   let authorizedCommit = "unknown";
 
   try {
@@ -171,35 +220,38 @@ async function main(): Promise<number> {
 
     for (const order of ["peer_a_first", "peer_b_first"] as ConnectOrder[]) {
       const correlationId = generateCorrelationId(`${runId}:${order}`);
-      const outcome = await runScenario({ order, correlationId, fakeAudio, layout });
-      scenarios.push(outcome.scenario);
-      diagnosticsBundle.push({
+      const scenario = await runScenario({
         order,
-        peerA: outcome.peerADiagnostics,
-        peerB: outcome.peerBDiagnostics,
+        correlationId,
+        fakeAudio,
+        runDir: layout.runDir,
+        runProcessLog: layout.processLog,
       });
-      if (outcome.scenario.result !== "PASS") {
-        finalResult = "FAILED";
-        failureMessage = outcome.scenario.error;
-        break;
+      scenarios.push(scenario);
+      if (scenario.result !== "PASS" && failureMessage === null) {
+        failureMessage = scenario.error;
       }
     }
 
-    if (finalResult === "PASS") {
-      if (!existsSync(layout.peerAJson) || !existsSync(layout.peerBJson)) {
-        throw new Error("missing finalized endpoint downloads");
-      }
-      validateLiveEndpoint(layout.peerAJson);
-      validateLiveEndpoint(layout.peerBJson);
-      pairLiveEndpoints(layout.peerAJson, layout.peerBJson, layout.pairedDir);
-      verifyLiveDirectory(layout.pairedDir);
+    if (!scenarios.every((scenario) => scenario.result === "PASS")) {
+      finalResult = "FAILED";
     }
   } catch (error) {
     finalResult = "FAILED";
     failureMessage = error instanceof Error ? error.message : String(error);
   } finally {
-    writeDiagnosticsBundle(layout.diagnosticsDir, diagnosticsBundle);
-    await processes.terminateAllAndWait();
+    try {
+      await processes.terminateAllAndWait();
+    } catch (error) {
+      cleanupFailed = true;
+      finalResult = "FAILED";
+      const cleanupMessage = error instanceof Error ? error.message : String(error);
+      failureMessage = failureMessage ?? cleanupMessage;
+    }
+  }
+
+  if (cleanupFailed) {
+    finalResult = "FAILED";
   }
 
   const report = buildAutomationReport({
@@ -221,3 +273,5 @@ main()
     console.error(error);
     process.exit(1);
   });
+
+export { runScenario, scenarioMayPass };

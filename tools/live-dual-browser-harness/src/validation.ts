@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { REPO_ROOT } from "./constants.js";
 
@@ -11,6 +12,15 @@ export function runCargoReport(args: string[]): { status: number; stdout: string
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
   };
+}
+
+export function assertFinalizedDownloadsExist(peerAPath: string, peerBPath: string): void {
+  if (!existsSync(peerAPath)) {
+    throw new Error(`missing finalized endpoint download: ${peerAPath}`);
+  }
+  if (!existsSync(peerBPath)) {
+    throw new Error(`missing finalized endpoint download: ${peerBPath}`);
+  }
 }
 
 export function validateLiveEndpoint(path: string): void {

@@ -10,7 +10,13 @@ import {
   validCompletedProbes,
   validLocalCompletedProbes,
 } from "./clock-probe";
-import { collectStatsPreflight, computeIntervalMetrics, deltaCumulativeMetric } from "./stats-sampler";
+import {
+  applyCandidatePairAudioFallback,
+  collectStatsPreflight,
+  computeIntervalMetrics,
+  deltaCumulativeMetric,
+  StatsSampler,
+} from "./stats-sampler";
 import { LiveWebRtcSession } from "./session";
 import {
   applySignalingDescription,
@@ -18,7 +24,6 @@ import {
   createNegotiationState,
   IceCandidateBuffer,
 } from "./negotiation";
-import { StatsSampler } from "./stats-sampler";
 import { invalid, observedNumber, unsupported, unavailable } from "./types";
 
 import type { ClockProbeSample, PeerRole } from "./types";
@@ -268,6 +273,45 @@ describe("stats interval metrics", () => {
     expect(deltaCumulativeMetric(observedNumber(1), invalid("x"))).toEqual(
       invalid("expected observed_number"),
     );
+  });
+
+  it("derives bitrates from candidate-pair fallback on consecutive samples", () => {
+    const candidatePair = (bytes: number, packets: number) => ({
+      packetsReceived: observedNumber(packets),
+      packetsSent: observedNumber(packets),
+      bytesReceived: observedNumber(bytes),
+      bytesSent: observedNumber(bytes),
+    });
+    const prevInbound: Record<string, ReturnType<typeof observedNumber>> = {};
+    const prevOutbound: Record<string, ReturnType<typeof observedNumber>> = {};
+    const currInbound: Record<string, ReturnType<typeof observedNumber>> = {};
+    const currOutbound: Record<string, ReturnType<typeof observedNumber>> = {};
+    applyCandidatePairAudioFallback(prevInbound, prevOutbound, candidatePair(1000, 10));
+    applyCandidatePairAudioFallback(currInbound, currOutbound, candidatePair(2000, 20));
+    const prev = {
+      offsetMs: 0,
+      candidatePair: candidatePair(1000, 10),
+      inboundAudio: prevInbound,
+      outboundAudio: prevOutbound,
+      remoteInboundAudio: {},
+      codec: {},
+    };
+    const curr = {
+      offsetMs: 1000,
+      candidatePair: candidatePair(2000, 20),
+      inboundAudio: currInbound,
+      outboundAudio: currOutbound,
+      remoteInboundAudio: {},
+      codec: {},
+    };
+    const metrics = computeIntervalMetrics(prev, curr);
+    expect(metrics.receiveBitrateBps).toEqual({ kind: "observed_number", value: 8000 });
+    expect(metrics.sendBitrateBps).toEqual({ kind: "observed_number", value: 8000 });
+    expect(currInbound.packetsReceived).toEqual(observedNumber(20));
+    expect(currOutbound.packetsSent).toEqual(observedNumber(20));
+    expect(currInbound.jitter).toEqual(unsupported());
+    expect(currInbound.packetsLost).toEqual(unsupported());
+    expect(metrics.packetLossDelta).toEqual(unsupported());
   });
 });
 

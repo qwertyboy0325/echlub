@@ -51,31 +51,64 @@ This directory is gitignored. The harness fails if its output path resolves unde
 Layout:
 
 ```text
-raw/peer-a.json
-raw/peer-b.json
-paired/…
-diagnostics/…
-automation-report.json
+.local/live-automation/<automation-run-id>/
+  scenarios/
+    peer-a-first/
+      raw/
+        peer-a.json
+        peer-b.json
+      paired/
+        peer-a.validated.json
+        peer-b.validated.json
+        peer-a.summary.json
+        peer-b.summary.json
+        pair-summary.json
+        report.md
+        artifact-manifest.json
+      diagnostics/
+        peer-a-screenshot.png
+        peer-b-screenshot.png
+        peer-a-trace.zip
+        peer-b-trace.zip
+        browser-console.json
+        process-log-reference.json
+    peer-b-first/
+      raw/
+      paired/
+      diagnostics/
+  automation-report.json
+  diagnostics/
+    process-log.txt
 ```
+
+Each connect-order scenario receives its own isolated directory tree. Validation, pairing, and directory verification run **inside** each scenario before it may report `PASS`. Overall automation `PASS` requires both scenarios to pass independently.
+
+Timing fields in `automation-report.json`:
+
+| Field | Meaning |
+|-------|---------|
+| `uiClickDispatchDeltaMs` | Playwright click dispatch skew between peers |
+| `actualEndpointStartDeltaMs` | Absolute difference of endpoint `startedAtUtc` values (must be ≤ 2000 ms) |
 
 ## Scenarios
 
 The harness runs two connection-order scenarios on one host:
 
-1. Peer A connects, then Peer B
-2. Peer B connects, then Peer A
+1. Peer A connects, then Peer B (`scenarios/peer-a-first/`)
+2. Peer B connects, then Peer A (`scenarios/peer-b-first/`)
 
-Each scenario requires both peers to reach **Ready To Observe**, start observation within a 2000 ms window, complete the full 60-second production observation, and export finalized endpoints through the UI.
+Each scenario requires both peers to reach **Ready To Observe**, dispatch observation start within a 2000 ms UI window, complete the full 60-second production observation, export finalized endpoints, pass independent validate/pair/verify checks, and retain its own diagnostics.
 
 ## Failure diagnostics
 
 On failure, inspect:
 
 - `.local/live-automation/<run-id>/automation-report.json`
-- `diagnostics/browser-console.json`
-- `diagnostics/peer-a-screenshot.png` and `peer-b-screenshot.png`
-- `diagnostics/playwright-trace.zip`
+- `scenarios/<scenario>/diagnostics/browser-console.json`
+- `scenarios/<scenario>/diagnostics/peer-a-screenshot.png` and `peer-b-screenshot.png`
+- `scenarios/<scenario>/diagnostics/peer-a-trace.zip` and `peer-b-trace.zip`
 - `diagnostics/process-log.txt`
+- `scenarios/<scenario>/diagnostics/process-log-reference.json`
 
 Captured fields include UI phase, connection/ICE/DataChannel state, sample/probe counts, visible errors, browser console output, and server logs.
 
