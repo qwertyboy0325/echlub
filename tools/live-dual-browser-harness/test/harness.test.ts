@@ -445,6 +445,140 @@ describe("RTP harness limitation classifier", () => {
   });
 });
 
+function baseFailedScenarioReport(
+  overrides: Partial<import("../src/report.js").ScenarioReport> = {},
+): import("../src/report.js").ScenarioReport {
+  return {
+    connectOrder: "peer_a_first",
+    result: "FAILED",
+    readyReached: false,
+    completedReached: false,
+    finalizedDownloads: "SKIPPED",
+    peerAEndpointValidation: "SKIPPED",
+    peerBEndpointValidation: "SKIPPED",
+    pairing: "SKIPPED",
+    directoryVerification: "SKIPPED",
+    uiClickDispatchDeltaMs: null,
+    actualEndpointStartDeltaMs: null,
+    outputDirectory: "/tmp/scenario",
+    error: "rtp_audio_stats_unavailable_under_fake_capture",
+    ...overrides,
+  };
+}
+
+function baseLimitationGateInput(
+  overrides: Partial<import("../src/report.js").ScenarioHarnessLimitationInput> = {},
+): import("../src/report.js").ScenarioHarnessLimitationInput {
+  const peer = basePeerDiagnostics();
+  return {
+    report: baseFailedScenarioReport(),
+    peerA: peer,
+    peerB: basePeerDiagnostics({
+      rtpPreflight: {
+        state: "exhausted",
+        attempts: 60,
+        inbound_audio_seen: true,
+        outbound_audio_seen: false,
+        elapsed_ms: 30_000,
+        failure_reason: "bounded RTP preflight window exhausted",
+        sanitized_report_shapes: [],
+      },
+    }),
+    diagnosticCaptureFailed: false,
+    cleanupFailed: false,
+    originalScenarioError: "rtp_audio_stats_unavailable_under_fake_capture",
+    ...overrides,
+  };
+}
+
+describe("fail-closed HARNESS_LIMITATION gate", () => {
+  it("accepts valid bounded bilateral RTP gap", async () => {
+    const { mayClassifyScenarioAsHarnessLimitation } = await import("../src/report.js");
+    const input = baseLimitationGateInput();
+    expect(mayClassifyScenarioAsHarnessLimitation(input)).toBe(
+      "bilateral_rtp_audio_stats_unavailable_under_fake_capture",
+    );
+  });
+
+  it("accepts valid inbound-only gap", async () => {
+    const { mayClassifyScenarioAsHarnessLimitation } = await import("../src/report.js");
+    const peer = basePeerDiagnostics({
+      rtpPreflight: {
+        state: "exhausted",
+        attempts: 60,
+        inbound_audio_seen: false,
+        outbound_audio_seen: true,
+        elapsed_ms: 30_000,
+        failure_reason: "bounded RTP preflight window exhausted",
+        sanitized_report_shapes: [],
+      },
+    });
+    const input = baseLimitationGateInput({ peerA: peer, peerB: peer });
+    expect(mayClassifyScenarioAsHarnessLimitation(input)).toBe(
+      "inbound_rtp_audio_stats_unavailable_under_fake_capture",
+    );
+  });
+
+  it("rejects screenshot failure", async () => {
+    const { mayClassifyScenarioAsHarnessLimitation } = await import("../src/report.js");
+    const input = baseLimitationGateInput({
+      diagnosticCaptureFailed: true,
+      peerA: basePeerDiagnostics({ error: "peer A diagnostic capture failed: screenshot failed" }),
+    });
+    expect(mayClassifyScenarioAsHarnessLimitation(input)).toBeNull();
+  });
+
+  it("rejects trace failure", async () => {
+    const { mayClassifyScenarioAsHarnessLimitation } = await import("../src/report.js");
+    const input = baseLimitationGateInput({
+      diagnosticCaptureFailed: true,
+      peerB: basePeerDiagnostics({ error: "peer B diagnostic capture failed: trace failed" }),
+    });
+    expect(mayClassifyScenarioAsHarnessLimitation(input)).toBeNull();
+  });
+
+  it("rejects diagnostic snapshot failure", async () => {
+    const { mayClassifyScenarioAsHarnessLimitation } = await import("../src/report.js");
+    const input = baseLimitationGateInput({
+      peerA: basePeerDiagnostics({ error: "peer diagnostic snapshot failed: timeout" }),
+    });
+    expect(mayClassifyScenarioAsHarnessLimitation(input)).toBeNull();
+  });
+
+  it("rejects browser close failure", async () => {
+    const { mayClassifyScenarioAsHarnessLimitation } = await import("../src/report.js");
+    const input = baseLimitationGateInput({
+      cleanupFailed: true,
+      peerA: basePeerDiagnostics({ error: "close failed: browser already closed" }),
+    });
+    expect(mayClassifyScenarioAsHarnessLimitation(input)).toBeNull();
+  });
+
+  it("rejects page error present", async () => {
+    const { mayClassifyScenarioAsHarnessLimitation } = await import("../src/report.js");
+    const input = baseLimitationGateInput({
+      peerA: basePeerDiagnostics({ pageErrors: ["Uncaught TypeError: boom"] }),
+    });
+    expect(mayClassifyScenarioAsHarnessLimitation(input)).toBeNull();
+  });
+
+  it("rejects unexpected original scenario error", async () => {
+    const { mayClassifyScenarioAsHarnessLimitation } = await import("../src/report.js");
+    const input = baseLimitationGateInput({
+      originalScenarioError: "ready timeout before both peers reached Ready or exhausted preflight",
+    });
+    expect(mayClassifyScenarioAsHarnessLimitation(input)).toBeNull();
+  });
+
+  it("rejects bounded RTP gap plus unrelated UI error", async () => {
+    const { mayClassifyScenarioAsHarnessLimitation } = await import("../src/report.js");
+    const input = baseLimitationGateInput({
+      peerA: basePeerDiagnostics({ error: "Signaling server unavailable" }),
+    });
+    expect(mayClassifyScenarioAsHarnessLimitation(input)).toBeNull();
+  });
+});
+
 describe("harness ready guard", () => {
   it("passes Ready with preflight available and zero observation samples", async () => {
     const { evaluatePeerReadyGuardFailures } = await import("../src/peer-runner.js");

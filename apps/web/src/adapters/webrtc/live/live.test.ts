@@ -1403,4 +1403,72 @@ describe("bounded RTP stats preflight polling", () => {
     expect(controller.getState()).not.toBe("available");
     vi.useRealTimers();
   });
+
+  it("clears queued restart when a second invalidate supersedes reconnect", async () => {
+    let resolveStats: ((value: Map<string, Record<string, unknown>>) => void) | undefined;
+    const getStats = vi.fn(
+      () =>
+        new Promise<Map<string, Record<string, unknown>>>((resolve) => {
+          resolveStats = resolve;
+        }),
+    );
+    const pc = { getStats } as unknown as RTCPeerConnection;
+    const controller = new RtpStatsPreflightController(pc, {
+      intervalMs: 100,
+      maximumDurationMs: 1000,
+      maximumAttempts: 3,
+    });
+
+    controller.maybeStart();
+    controller.invalidate("peer connection disconnected");
+    controller.restartWhenIdle();
+    controller.invalidate("ICE disconnected again");
+    resolveStats?.(transportOnlyStats());
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(getStats).toHaveBeenCalledTimes(1);
+    expect(controller.getState()).toBe("cancelled");
+    expect(controller.getDiagnostics().inbound_audio_seen).toBe(false);
+    expect(controller.getDiagnostics().outbound_audio_seen).toBe(false);
+
+    controller.restartWhenIdle();
+    await Promise.resolve();
+    expect(getStats).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not auto-restart after available invalidate when reconnect is superseded", async () => {
+    let resolveStats: ((value: Map<string, Record<string, unknown>>) => void) | undefined;
+    let call = 0;
+    const getStats = vi.fn(() => {
+      call += 1;
+      if (call === 1) {
+        return Promise.resolve(rtpAudioStats({ inbound: true, outbound: true }));
+      }
+      return new Promise<Map<string, Record<string, unknown>>>((resolve) => {
+        resolveStats = resolve;
+      });
+    });
+    const pc = { getStats } as unknown as RTCPeerConnection;
+    const controller = new RtpStatsPreflightController(pc, {
+      intervalMs: 100,
+      maximumDurationMs: 1000,
+      maximumAttempts: 3,
+    });
+
+    controller.maybeStart();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(controller.getState()).toBe("available");
+
+    controller.invalidate("peer connection disconnected");
+    controller.restartWhenIdle();
+    controller.invalidate("ICE disconnected again");
+    resolveStats?.(transportOnlyStats());
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(getStats).toHaveBeenCalledTimes(2);
+    expect(controller.getState()).toBe("cancelled");
+  });
 });

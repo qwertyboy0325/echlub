@@ -108,6 +108,44 @@ export function classifyRtpHarnessLimitation(peerA: PeerDiagnostics, peerB: Peer
   return "bilateral_rtp_audio_stats_unavailable_under_fake_capture";
 }
 
+export const BOUNDED_RTP_PREFLIGHT_SCENARIO_FAILURE = "rtp_audio_stats_unavailable_under_fake_capture";
+
+function peerDiagnosticSnapshotAvailable(peer: PeerDiagnostics): boolean {
+  if (peer.error?.includes("snapshot failed") || peer.error?.includes("capture failed")) {
+    return false;
+  }
+  return peer.rtpPreflight?.state === "exhausted" && peer.connection === "connected";
+}
+
+function peerHasUnrelatedFailure(peer: PeerDiagnostics): boolean {
+  if (peer.pageErrors.length > 0) return true;
+  return peer.error !== null && peer.error.length > 0;
+}
+
+export interface ScenarioHarnessLimitationInput {
+  report: ScenarioReport;
+  peerA: PeerDiagnostics;
+  peerB: PeerDiagnostics;
+  diagnosticCaptureFailed: boolean;
+  cleanupFailed: boolean;
+  originalScenarioError: string | null;
+}
+
+export function mayClassifyScenarioAsHarnessLimitation(
+  input: ScenarioHarnessLimitationInput,
+): string | null {
+  if (input.report.readyReached) return null;
+  if (input.report.result !== "FAILED") return null;
+  if (input.diagnosticCaptureFailed || input.cleanupFailed) return null;
+  if (input.originalScenarioError !== BOUNDED_RTP_PREFLIGHT_SCENARIO_FAILURE) return null;
+  if (input.report.finalizedDownloads !== "SKIPPED") return null;
+  if (!peerDiagnosticSnapshotAvailable(input.peerA)) return null;
+  if (!peerDiagnosticSnapshotAvailable(input.peerB)) return null;
+  if (peerHasUnrelatedFailure(input.peerA)) return null;
+  if (peerHasUnrelatedFailure(input.peerB)) return null;
+  return classifyRtpHarnessLimitation(input.peerA, input.peerB);
+}
+
 export function buildAutomationReport(input: {
   authorizedCommit: string;
   result: AutomationResult;

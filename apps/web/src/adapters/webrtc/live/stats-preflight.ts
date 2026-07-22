@@ -114,7 +114,7 @@ export class RtpStatsPreflightController {
   private retryHandle: ReturnType<typeof setTimeout> | null = null;
   private inFlight = false;
   private inFlightGeneration: number | null = null;
-  private restartWhenIdleRequested = false;
+  private restartRequestedForGeneration: number | null = null;
   private readonly now: () => number;
   private readonly scheduleRetry: (delayMs: number, callback: () => void) => ReturnType<typeof setTimeout>;
   private readonly clearRetry: (handle: ReturnType<typeof setTimeout>) => void;
@@ -157,7 +157,7 @@ export class RtpStatsPreflightController {
     if (this.state === "available" || this.state === "exhausted") return;
     if (this.state === "probing" && !this.inFlight) return;
     if (this.inFlight) {
-      this.restartWhenIdleRequested = true;
+      this.requestRestartWhenIdle();
       return;
     }
     if (this.state === "idle") {
@@ -168,6 +168,7 @@ export class RtpStatsPreflightController {
   invalidate(reason: string): void {
     this.clearPendingRetry();
     this.generation += 1;
+    this.clearRestartRequest();
     this.state = "cancelled";
     this.failureReason = reason;
     this.resetGenerationObservations();
@@ -175,12 +176,14 @@ export class RtpStatsPreflightController {
   }
 
   restartWhenIdle(): void {
+    if (this.state === "available") return;
     if (this.inFlight) {
-      this.restartWhenIdleRequested = true;
+      this.requestRestartWhenIdle();
       return;
     }
-    if (this.state === "available") return;
-    this.startNewGeneration();
+    if (this.state === "cancelled" || this.state === "idle") {
+      this.startNewGeneration();
+    }
   }
 
   reset(): void {
@@ -189,7 +192,7 @@ export class RtpStatsPreflightController {
     this.state = "idle";
     this.failureReason = null;
     this.resetGenerationObservations();
-    this.restartWhenIdleRequested = false;
+    this.clearRestartRequest();
     this.onUpdate();
   }
 
@@ -266,15 +269,25 @@ export class RtpStatsPreflightController {
     return true;
   }
 
+  private clearRestartRequest(): void {
+    this.restartRequestedForGeneration = null;
+  }
+
+  private requestRestartWhenIdle(): void {
+    this.restartRequestedForGeneration = this.generation;
+  }
+
   private finishInFlight(token: number): void {
     if (this.inFlightGeneration !== token) return;
     this.inFlight = false;
     this.inFlightGeneration = null;
-    if (this.restartWhenIdleRequested) {
-      this.restartWhenIdleRequested = false;
-      if (this.state !== "available") {
-        this.startNewGeneration();
-      }
+    if (
+      this.restartRequestedForGeneration !== null &&
+      this.restartRequestedForGeneration === this.generation &&
+      (this.state === "cancelled" || this.state === "idle")
+    ) {
+      this.clearRestartRequest();
+      this.startNewGeneration();
     }
   }
 

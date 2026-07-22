@@ -31,8 +31,8 @@ import { ProcessManager } from "./process-manager.js";
 import {
   allRequiredScenariosPassed,
   buildAutomationReport,
-  classifyRtpHarnessLimitation,
   createScenarioReport,
+  mayClassifyScenarioAsHarnessLimitation,
   scenarioMayPass,
   type ScenarioReport,
 } from "./report.js";
@@ -113,6 +113,8 @@ async function runScenario(options: {
   let peerADiagnostics = emptyDiagnostics("peer A not launched");
   let peerBDiagnostics = emptyDiagnostics("peer B not launched");
   let diagnosticCaptureFailed = false;
+  let cleanupFailed = false;
+  let originalScenarioError: string | null = null;
 
   try {
     if (userDataA === userDataB) {
@@ -172,6 +174,7 @@ async function runScenario(options: {
     report.result = "PASS";
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    originalScenarioError = message;
     report.error = message;
     report.result = "FAILED";
 
@@ -219,11 +222,15 @@ async function runScenario(options: {
         try {
           await closePeer(peerA);
         } catch (error) {
-          diagnosticCaptureFailed = true;
+          cleanupFailed = true;
           const message = error instanceof Error ? error.message : String(error);
-          peerADiagnostics.error = `${peerADiagnostics.error}; close failed: ${message}`;
+          peerADiagnostics.error = `${peerADiagnostics.error ?? ""}; close failed: ${message}`.replace(/^; /, "");
         }
-        removeTempUserDataDir(userDataA);
+        try {
+          removeTempUserDataDir(userDataA);
+        } catch (error) {
+          cleanupFailed = true;
+        }
       }
     } else {
       removeTempUserDataDir(userDataA);
@@ -245,29 +252,40 @@ async function runScenario(options: {
         try {
           await closePeer(peerB);
         } catch (error) {
-          diagnosticCaptureFailed = true;
+          cleanupFailed = true;
           const message = error instanceof Error ? error.message : String(error);
-          peerBDiagnostics.error = `${peerBDiagnostics.error}; close failed: ${message}`;
+          peerBDiagnostics.error = `${peerBDiagnostics.error ?? ""}; close failed: ${message}`.replace(/^; /, "");
         }
-        removeTempUserDataDir(userDataB);
+        try {
+          removeTempUserDataDir(userDataB);
+        } catch (error) {
+          cleanupFailed = true;
+        }
       }
     } else {
       removeTempUserDataDir(userDataB);
     }
 
     await writeScenarioDiagnostics(layout, options.runProcessLog, peerADiagnostics, peerBDiagnostics);
-    if (!report.readyReached && report.result === "FAILED") {
-      const limitationReason = classifyRtpHarnessLimitation(peerADiagnostics, peerBDiagnostics);
+    if (diagnosticCaptureFailed || cleanupFailed) {
+      report.result = "FAILED";
+      report.error =
+        originalScenarioError ??
+        report.error ??
+        (cleanupFailed ? "browser cleanup failed" : "diagnostic capture failed");
+    } else if (!report.readyReached && report.result === "FAILED") {
+      const limitationReason = mayClassifyScenarioAsHarnessLimitation({
+        report,
+        peerA: peerADiagnostics,
+        peerB: peerBDiagnostics,
+        diagnosticCaptureFailed,
+        cleanupFailed,
+        originalScenarioError,
+      });
       if (limitationReason) {
         report.result = "HARNESS_LIMITATION";
         report.error = limitationReason;
       }
-    }
-    if (diagnosticCaptureFailed && report.result === "PASS") {
-      report.result = "FAILED";
-      report.error = report.error ?? "diagnostic capture failed";
-    } else if (diagnosticCaptureFailed) {
-      report.error = report.error ?? "diagnostic capture failed";
     }
   }
 
