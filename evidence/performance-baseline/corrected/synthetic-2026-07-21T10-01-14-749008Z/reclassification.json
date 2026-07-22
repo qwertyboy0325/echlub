@@ -1,0 +1,9 @@
+{
+  "status": "superseded",
+  "structurallyValid": true,
+  "observationValid": false,
+  "harnessLimitation": true,
+  "reason": "RTP byte progression is not pulse detection",
+  "supersededByPolicy": "ECHLUB-PERFORMANCE-LAB-EXTERNAL-REVIEW-CORRECTION-02",
+  "note": "Historical observation.json values preserved unchanged"
+}

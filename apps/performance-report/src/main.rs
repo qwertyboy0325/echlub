@@ -1,11 +1,28 @@
-use echlub_performance::{parse_and_validate, summarize_run, validate_run, PerformanceRunV1};
+use echlub_performance::{
+    assess_synthetic_observation, build_manifest_entries, checksum_bytes, pair_live_endpoints,
+    parse_and_validate, parse_and_validate_live_endpoint, summarize_run, validate_live_directory,
+    validate_live_endpoint, validate_run, PerformanceRunV1,
+};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
 fn usage() {
-    eprintln!("Usage: performance-report <validate|summarize|verify-directory> [path]");
+    eprintln!(
+        "Usage: performance-report <command> [args]\n\
+Commands:\n\
+  validate <file>\n\
+  assess-synthetic <file>\n\
+  summarize <file>\n\
+  verify-directory <dir>\n\
+  validate-live-endpoint <file>\n\
+  validate-live-draft <file>\n\
+  summarize-live-endpoint <file> [--output <dir>]\n\
+  pair-live-endpoints <peer-a.json> <peer-b.json> [--output <dir>]\n\
+  verify-live-directory <dir>\n\
+  checksum-file <file>"
+    );
     process::exit(1);
 }
 
@@ -16,36 +33,52 @@ fn main() {
     }
 
     match args[1].as_str() {
-        "validate" => {
-            let path = args.get(2).map(PathBuf::from).unwrap_or_else(|| {
-                eprintln!("validate requires a file path");
-                process::exit(1);
-            });
-            validate_file(&path);
+        "validate" => validate_file(require_path(&args, 2)),
+        "assess-synthetic" => assess_file(require_path(&args, 2)),
+        "summarize" => summarize_file(require_path(&args, 2)),
+        "verify-directory" => verify_directory(require_path(&args, 2)),
+        "validate-live-endpoint" => validate_live_file(require_path(&args, 2), true),
+        "validate-live-draft" => validate_live_file(require_path(&args, 2), false),
+        "summarize-live-endpoint" => {
+            let path = require_path(&args, 2);
+            let out = output_dir(&args, 3)
+                .unwrap_or_else(|| path.parent().unwrap_or(Path::new(".")).to_path_buf());
+            summarize_live_file(path, &out);
         }
-        "summarize" => {
-            let path = args.get(2).map(PathBuf::from).unwrap_or_else(|| {
-                eprintln!("summarize requires a file path");
-                process::exit(1);
-            });
-            summarize_file(&path);
+        "pair-live-endpoints" => {
+            let peer_a = require_path(&args, 2);
+            let peer_b = require_path(&args, 3);
+            let out =
+                output_dir(&args, 4).unwrap_or_else(|| PathBuf::from("evidence/live-two-peer/out"));
+            pair_files(peer_a, peer_b, &out);
         }
-        "verify-directory" => {
-            let path = args.get(2).map(PathBuf::from).unwrap_or_else(|| {
-                eprintln!("verify-directory requires a directory path");
-                process::exit(1);
-            });
-            verify_directory(&path);
-        }
+        "verify-live-directory" => verify_live_dir(require_path(&args, 2)),
+        "checksum-file" => checksum_file(require_path(&args, 2)),
         _ => usage(),
     }
 }
 
+fn require_path(args: &[String], idx: usize) -> &Path {
+    args.get(idx)
+        .map(String::as_str)
+        .map(Path::new)
+        .unwrap_or_else(|| {
+            eprintln!("missing path argument");
+            process::exit(1);
+        })
+}
+
+fn output_dir(args: &[String], start: usize) -> Option<PathBuf> {
+    args.iter()
+        .skip(start)
+        .collect::<Vec<_>>()
+        .windows(2)
+        .find(|w| w[0] == "--output")
+        .map(|w| PathBuf::from(w[1].clone()))
+}
+
 fn validate_file(path: &Path) {
-    let json = fs::read_to_string(path).unwrap_or_else(|e| {
-        eprintln!("read error: {e}");
-        process::exit(1);
-    });
+    let json = read_file(path);
     let result = validate_run(&json);
     if result.valid {
         println!("VALID: {}", path.display());
@@ -58,18 +91,37 @@ fn validate_file(path: &Path) {
     }
 }
 
-fn summarize_file(path: &Path) {
-    let json = fs::read_to_string(path).unwrap_or_else(|e| {
-        eprintln!("read error: {e}");
-        process::exit(1);
-    });
-    let run = parse_and_validate(&json).unwrap_or_else(|r| {
-        eprintln!("validation failed:");
-        for err in r.errors {
+fn assess_file(path: &Path) {
+    let json = read_file(path);
+    let result = assess_synthetic_observation(&json);
+    if result.pass {
+        println!("ASSESS PASS: {}", path.display());
+    } else {
+        eprintln!("ASSESS FAIL: {}", path.display());
+        for err in &result.errors {
             eprintln!("  - {err}");
         }
         process::exit(1);
-    });
+    }
+}
+
+fn validate_live_file(path: &Path, require_finalized: bool) {
+    let json = read_file(path);
+    let result = validate_live_endpoint(&json, require_finalized);
+    if result.valid {
+        println!("VALID: {}", path.display());
+    } else {
+        eprintln!("INVALID: {}", path.display());
+        for err in &result.errors {
+            eprintln!("  - {err}");
+        }
+        process::exit(1);
+    }
+}
+
+fn summarize_file(path: &Path) {
+    let json = read_file(path);
+    let run = parse_and_validate(&json).unwrap_or_else(|r| fail_validation(r.errors));
     let run_with_derived = PerformanceRunV1 {
         derived: Some(echlub_performance::compute_derived_metrics(&run)),
         ..run
@@ -82,6 +134,80 @@ fn summarize_file(path: &Path) {
         process::exit(1);
     });
     println!("Report written to {}", report_path.display());
+}
+
+fn summarize_live_file(path: &Path, out_dir: &Path) {
+    fs::create_dir_all(out_dir).ok();
+    let json = read_file(path);
+    let endpoint = parse_and_validate_live_endpoint(&json, false)
+        .unwrap_or_else(|r| fail_live_validation(r.errors));
+    let summary_path = out_dir.join("summary.json");
+    fs::write(
+        &summary_path,
+        serde_json::to_string_pretty(&endpoint.derived.unwrap_or_default()).unwrap(),
+    )
+    .unwrap();
+    println!("Summary written to {}", summary_path.display());
+}
+
+fn pair_files(peer_a: &Path, peer_b: &Path, out_dir: &Path) {
+    fs::create_dir_all(out_dir).unwrap_or_else(|e| {
+        eprintln!("mkdir error: {e}");
+        process::exit(1);
+    });
+    let a_json = read_file(peer_a);
+    let b_json = read_file(peer_b);
+    let artifacts = pair_live_endpoints(&a_json, &b_json).unwrap_or_else(|r| {
+        eprintln!("pair validation failed:");
+        for err in r.errors {
+            eprintln!("  - {err}");
+        }
+        process::exit(1);
+    });
+
+    fs::write(
+        out_dir.join("peer-a.validated.json"),
+        serde_json::to_string_pretty(&artifacts.peer_a).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        out_dir.join("peer-b.validated.json"),
+        serde_json::to_string_pretty(&artifacts.peer_b).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        out_dir.join("peer-a.summary.json"),
+        serde_json::to_string_pretty(&artifacts.peer_a_summary).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        out_dir.join("peer-b.summary.json"),
+        serde_json::to_string_pretty(&artifacts.peer_b_summary).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        out_dir.join("pair-summary.json"),
+        serde_json::to_string_pretty(&artifacts.pair).unwrap(),
+    )
+    .unwrap();
+    fs::write(out_dir.join("report.md"), &artifacts.report_markdown).unwrap();
+
+    let manifest = build_manifest_entries(
+        out_dir,
+        &artifacts.pair.pair_id,
+        &artifacts.pair.session_correlation_id,
+        &artifacts.pair.software_commit,
+    )
+    .unwrap_or_else(|e| {
+        eprintln!("manifest build error: {e}");
+        process::exit(1);
+    });
+    fs::write(
+        out_dir.join("artifact-manifest.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    println!("Paired artifacts written to {}", out_dir.display());
 }
 
 fn verify_directory(dir: &Path) {
@@ -97,9 +223,7 @@ fn verify_directory(dir: &Path) {
     }) {
         let entry = entry.unwrap();
         let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) == Some("json")
-            && path.file_name().and_then(|n| n.to_str()) != Some("report.md")
-        {
+        if path.extension().and_then(|e| e.to_str()) == Some("json") {
             let json = fs::read_to_string(&path).unwrap();
             let result = validate_run(&json);
             if result.valid {
@@ -115,4 +239,47 @@ fn verify_directory(dir: &Path) {
         process::exit(1);
     }
     println!("Verified {valid} artifact(s) in {}", dir.display());
+}
+
+fn verify_live_dir(dir: &Path) {
+    let result = validate_live_directory(dir);
+    if result.valid {
+        println!("VALID live directory: {}", dir.display());
+    } else {
+        for err in result.errors {
+            eprintln!("  - {err}");
+        }
+        process::exit(1);
+    }
+}
+
+fn checksum_file(path: &Path) {
+    let bytes = fs::read(path).unwrap_or_else(|e| {
+        eprintln!("read error: {e}");
+        process::exit(1);
+    });
+    println!("{}", checksum_bytes(&bytes));
+}
+
+fn read_file(path: &Path) -> String {
+    fs::read_to_string(path).unwrap_or_else(|e| {
+        eprintln!("read error: {e}");
+        process::exit(1);
+    })
+}
+
+fn fail_validation(errors: Vec<echlub_performance::ValidationError>) -> ! {
+    eprintln!("validation failed:");
+    for err in errors {
+        eprintln!("  - {err}");
+    }
+    process::exit(1);
+}
+
+fn fail_live_validation(errors: Vec<echlub_performance::LiveValidationError>) -> ! {
+    eprintln!("live validation failed:");
+    for err in errors {
+        eprintln!("  - {err}");
+    }
+    process::exit(1);
 }

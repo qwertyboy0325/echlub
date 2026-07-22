@@ -1,0 +1,2167 @@
+{
+  "schemaVersion": "echlub.performance.live-observation/v1",
+  "evidenceLevel": "browser_network_observation",
+  "evidenceStatus": "exploratory_non_authoritative",
+  "runId": "live-endpoint-offset-mismatch",
+  "sessionCorrelationId": "0123456789abcdef0123456789abcdef",
+  "peerRole": "peer_a",
+  "startedAtUtc": "2026-07-21T09:00:00Z",
+  "completedAtUtc": "2026-07-21T09:01:00Z",
+  "softwareCommit": "e4198657264a6b4629948469dcdabde21a3eaa34",
+  "exportKind": "finalized",
+  "environment": {
+    "browserFamily": "chromium",
+    "platform": "darwin",
+    "secureContext": true
+  },
+  "capture": {
+    "profile": "browser_default"
+  },
+  "playout": {
+    "path": "html_media_element",
+    "remoteAudioTrackReceived": true,
+    "remoteAudioTrackReadyState": "live",
+    "autoplayAttempted": true
+  },
+  "connectionLifecycle": {
+    "peerConnectionState": "connected",
+    "iceConnectionState": "connected",
+    "signalingState": "stable"
+  },
+  "dataChannel": {
+    "label": "echlub-clock-probe",
+    "owner": true,
+    "readyState": "open"
+  },
+  "clockProbes": {
+    "samples": [
+      {
+        "sequence": 0,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1000,
+        "t1": 1510,
+        "t2": 1511,
+        "t3": 1021,
+        "rttMs": 20,
+        "offsetMs": 123.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      },
+      {
+        "sequence": 1,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1001,
+        "t1": 1511,
+        "t2": 1512,
+        "t3": 1022,
+        "rttMs": 20,
+        "offsetMs": 500.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      },
+      {
+        "sequence": 2,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1002,
+        "t1": 1512,
+        "t2": 1513,
+        "t3": 1023,
+        "rttMs": 20,
+        "offsetMs": 500.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      },
+      {
+        "sequence": 3,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1003,
+        "t1": 1513,
+        "t2": 1514,
+        "t3": 1024,
+        "rttMs": 20,
+        "offsetMs": 500.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      },
+      {
+        "sequence": 4,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1004,
+        "t1": 1514,
+        "t2": 1515,
+        "t3": 1025,
+        "rttMs": 20,
+        "offsetMs": 500.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      },
+      {
+        "sequence": 5,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1005,
+        "t1": 1515,
+        "t2": 1516,
+        "t3": 1026,
+        "rttMs": 20,
+        "offsetMs": 500.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      },
+      {
+        "sequence": 6,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1006,
+        "t1": 1516,
+        "t2": 1517,
+        "t3": 1027,
+        "rttMs": 20,
+        "offsetMs": 500.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      },
+      {
+        "sequence": 7,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1007,
+        "t1": 1517,
+        "t2": 1518,
+        "t3": 1028,
+        "rttMs": 20,
+        "offsetMs": 500.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      },
+      {
+        "sequence": 8,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1008,
+        "t1": 1518,
+        "t2": 1519,
+        "t3": 1029,
+        "rttMs": 20,
+        "offsetMs": 500.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      },
+      {
+        "sequence": 9,
+        "requesterRole": "peer_a",
+        "responderRole": "peer_b",
+        "protocolVersion": 1,
+        "t0": 1009,
+        "t1": 1519,
+        "t2": 1520,
+        "t3": 1030,
+        "rttMs": 20,
+        "offsetMs": 500.0,
+        "timeout": false,
+        "duplicate": false,
+        "unsolicited": false,
+        "invalid": false
+      }
+    ],
+    "completedProbes": 10,
+    "medianRttMs": 20,
+    "medianOffsetMs": 0
+  },
+  "statsSamples": [
+    {
+      "offsetMs": 0,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 10
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 1000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 5
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 500
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 2000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 15
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 1500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 8
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 800
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 4000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 20
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 2000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 11
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 1100
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 6000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 25
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 2500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 14
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 1400
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 8000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 30
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 3000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 17
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 1700
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 10000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 35
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 3500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 20
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 2000
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 12000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 40
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 4000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 23
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 2300
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 14000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 45
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 4500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 26
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 2600
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 16000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 50
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 5000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 29
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 2900
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 18000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 55
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 5500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 32
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 3200
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 20000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 60
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 6000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 35
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 3500
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 22000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 65
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 6500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 38
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 3800
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 24000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 70
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 7000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 41
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 4100
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 26000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 75
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 7500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 44
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 4400
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 28000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 80
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 8000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 47
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 4700
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 30000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 85
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 8500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 50
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 5000
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 32000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 90
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 9000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 53
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 5300
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 34000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 95
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 9500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 56
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 5600
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 36000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 100
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 10000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 59
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 5900
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 38000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 105
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 10500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 62
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 6200
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 40000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 110
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 11000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 65
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 6500
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 42000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 115
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 11500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 68
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 6800
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 44000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 120
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 12000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 71
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 7100
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 46000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 125
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 12500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 74
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 7400
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 48000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 130
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 13000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 77
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 7700
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 50000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 135
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 13500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 80
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 8000
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 52000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 140
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 14000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 83
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 8300
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 54000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 145
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 14500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 86
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 8600
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 56000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 150
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 15000
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 89
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 8900
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    },
+    {
+      "offsetMs": 58000,
+      "candidatePair": {
+        "state": {
+          "kind": "observed_category",
+          "value": "succeeded"
+        },
+        "protocol": {
+          "kind": "observed_category",
+          "value": "udp"
+        },
+        "currentRoundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "inboundAudio": {
+        "packetsReceived": {
+          "kind": "observed_number",
+          "value": 155
+        },
+        "bytesReceived": {
+          "kind": "observed_number",
+          "value": 15500
+        },
+        "jitterBufferDelay": {
+          "kind": "observed_number",
+          "value": 0.01
+        },
+        "jitterBufferTargetDelay": {
+          "kind": "observed_number",
+          "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "outboundAudio": {
+        "packetsSent": {
+          "kind": "observed_number",
+          "value": 92
+        },
+        "bytesSent": {
+          "kind": "observed_number",
+          "value": 9200
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
+        }
+      },
+      "remoteInboundAudio": {
+        "roundTripTime": {
+          "kind": "observed_number",
+          "value": 0.02
+        }
+      },
+      "codec": {
+        "mimeType": {
+          "kind": "observed_category",
+          "value": "audio/opus"
+        }
+      }
+    }
+  ],
+  "unsupportedMetrics": {
+    "acousticMouthToEar": {
+      "kind": "unsupported"
+    },
+    "oneWayNetworkLatency": {
+      "kind": "unavailable",
+      "reason": "not measured"
+    }
+  },
+  "limitations": [
+    "Exploratory non-authoritative browser network observation."
+  ]
+}

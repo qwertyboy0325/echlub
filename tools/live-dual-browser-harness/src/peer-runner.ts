@@ -1,0 +1,319 @@
+import { readFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { chromium, type BrowserContext, type Download, type Page } from "playwright";
+import {
+  COMPLETED_TIMEOUT_MS,
+  LIVE_URL,
+  OBSERVATION_SECONDS,
+  READY_TIMEOUT_MS,
+  SIGNALING_URL,
+  type ConnectOrder,
+  type PeerDiagnostics,
+} from "./constants.js";
+import { sleep } from "./process-manager.js";
+
+export interface PeerConfig {
+  role: "peer_a" | "peer_b";
+  correlationId: string;
+  fakeAudioPath: string;
+  userDataDir: string;
+  diagnosticsDir: string;
+}
+
+export interface PeerSession {
+  role: "peer_a" | "peer_b";
+  context: BrowserContext;
+  page: Page;
+  consoleLogs: string[];
+  pageErrors: string[];
+}
+
+export async function launchPeer(config: PeerConfig): Promise<PeerSession> {
+  const consoleLogs: string[] = [];
+  const pageErrors: string[] = [];
+  const fakeAudio = resolve(config.fakeAudioPath);
+  const context = await chromium.launchPersistentContext(config.userDataDir, {
+    headless: false,
+    args: [
+      "--use-fake-device-for-media-stream",
+      "--use-fake-ui-for-media-stream",
+      `--use-file-for-fake-audio-capture=${fakeAudio}`,
+      "--autoplay-policy=no-user-gesture-required",
+    ],
+    permissions: ["microphone"],
+    acceptDownloads: true,
+    viewport: { width: 1280, height: 900 },
+  });
+  await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  const page = context.pages()[0] ?? (await context.newPage());
+  page.on("console", (message) => {
+    consoleLogs.push(`[${message.type()}] ${message.text()}`);
+  });
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+  await page.goto(LIVE_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.getByRole("button", { name: "Live Session" }).click();
+  await configurePeer(page, config);
+  return { role: config.role, context, page, consoleLogs, pageErrors };
+}
+
+async function configurePeer(page: Page, config: PeerConfig): Promise<void> {
+  const panel = page.locator("section.performance-panel");
+  await panel.getByRole("heading", { name: /Live Two-Peer Observation/i }).waitFor({ timeout: 60_000 });
+  await panel.locator("label").filter({ hasText: "Session correlation ID" }).locator("input").fill(config.correlationId);
+  await panel.locator("select").nth(0).selectOption(config.role);
+  await panel.locator("label").filter({ hasText: "Signaling URL" }).locator("input").fill(SIGNALING_URL);
+  await panel.locator("select").nth(1).selectOption("browser_default");
+  await panel.getByRole("checkbox").check();
+  await panel.getByRole("button", { name: /^Prepare$/i }).click();
+  await panel.getByRole("button", { name: /Enable Microphone/i }).click();
+}
+
+export async function connectPeer(page: Page): Promise<void> {
+  const panel = page.locator("section.performance-panel");
+  await panel.getByRole("button", { name: /^Connect$/i }).click();
+}
+
+export async function waitForReady(page: Page, timeoutMs = READY_TIMEOUT_MS): Promise<void> {
+  const panel = page.locator("section.performance-panel");
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const diagnostics = await readDiagnostics(page);
+    if (diagnostics.phase?.includes("Ready To Observe")) {
+      return;
+    }
+    await sleep(500);
+  }
+  await panel.getByText(/Phase: Ready To Observe/i).waitFor({ timeout: 1_000 });
+}
+
+type PeerPreflightWaitState = "pending" | "ready" | "exhausted";
+
+async function readPeerPreflightWaitState(page: Page): Promise<PeerPreflightWaitState> {
+  const diagnostics = await readDiagnostics(page);
+  if (diagnostics.phase?.includes("Ready To Observe")) {
+    return "ready";
+  }
+  if (diagnostics.rtpPreflight?.state === "exhausted") {
+    return "exhausted";
+  }
+  return "pending";
+}
+
+export async function waitForBothPeersReadyOrExhausted(
+  peerA: PeerSession,
+  peerB: PeerSession,
+  timeoutMs = READY_TIMEOUT_MS,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let peerAState: PeerPreflightWaitState = "pending";
+  let peerBState: PeerPreflightWaitState = "pending";
+
+  while (Date.now() < deadline) {
+    if (peerAState === "pending") {
+      peerAState = await readPeerPreflightWaitState(peerA.page);
+    }
+    if (peerBState === "pending") {
+      peerBState = await readPeerPreflightWaitState(peerB.page);
+    }
+    if (peerAState === "ready" && peerBState === "ready") {
+      return;
+    }
+    if (peerAState === "exhausted" && peerBState === "exhausted") {
+      throw new Error("rtp_audio_stats_unavailable_under_fake_capture");
+    }
+    await sleep(500);
+  }
+
+  throw new Error("ready timeout before both peers reached Ready or exhausted preflight");
+}
+
+export async function startObservation(page: Page): Promise<void> {
+  const panel = page.locator("section.performance-panel");
+  await panel.getByRole("button", { name: /Start 60s Observation/i }).click();
+}
+
+export async function waitForCompleted(page: Page, timeoutMs = COMPLETED_TIMEOUT_MS): Promise<void> {
+  const panel = page.locator("section.performance-panel");
+  await panel.getByText(/Phase: Completed/i).waitFor({ timeout: timeoutMs });
+}
+
+export async function exportFinalized(page: Page, destination: string): Promise<void> {
+  const panel = page.locator("section.performance-panel");
+  const downloadPromise = page.waitForEvent("download", { timeout: 30_000 });
+  await panel.getByRole("button", { name: /Export Finalized Endpoint/i }).click();
+  const download = await downloadPromise;
+  await download.saveAs(destination);
+}
+
+export async function readDiagnostics(page: Page): Promise<PeerDiagnostics> {
+  const bodyText = await page.locator("section.performance-panel").innerText();
+  const phase = bodyText.match(/Phase: (.+)/)?.[1] ?? null;
+  const connection = bodyText.match(/Connection: ([^\|]+)/)?.[1]?.trim() ?? null;
+  const ice = bodyText.match(/ICE: ([^\|]+)/)?.[1]?.trim() ?? null;
+  const dc = bodyText.match(/DataChannel: (.+)/)?.[1]?.trim() ?? null;
+  const samples = bodyText.match(/Samples: (\d+)/)?.[1] ?? null;
+  const probes = bodyText.match(/Probes: (\d+)/)?.[1] ?? null;
+  const error = (await page.locator(".error").allTextContents()).join("; ") || null;
+  const rtpPreflight = await page.evaluate(() => {
+    const reader = (
+      window as unknown as {
+        __echlubLiveRtpPreflightDiagnostics?: () => Record<string, unknown> | null;
+      }
+    ).__echlubLiveRtpPreflightDiagnostics;
+    return reader?.() ?? null;
+  });
+  const remoteTrackLive = await page.evaluate(() => {
+    const audio = document.getElementById("remote-audio") as HTMLAudioElement | null;
+    const stream = audio?.srcObject as MediaStream | null;
+    return Boolean(stream?.getAudioTracks().some((track) => track.readyState === "live"));
+  });
+  return {
+    phase,
+    connection,
+    ice,
+    dataChannel: dc,
+    samples,
+    probes,
+    remoteTrackLive,
+    error,
+    console: [],
+    pageErrors: [],
+    rtpPreflight: rtpPreflight as PeerDiagnostics["rtpPreflight"],
+  };
+}
+
+export async function snapshotPeerDiagnostics(session: PeerSession): Promise<PeerDiagnostics> {
+  const diagnostics = await readDiagnostics(session.page);
+  diagnostics.console = [...session.consoleLogs];
+  diagnostics.pageErrors = [...session.pageErrors];
+  return diagnostics;
+}
+
+export async function capturePeerArtifacts(
+  session: PeerSession,
+  diagnosticsDir: string,
+  prefix: "peer-a" | "peer-b",
+  existingDiagnostics?: PeerDiagnostics,
+): Promise<PeerDiagnostics> {
+  const diagnostics = existingDiagnostics ?? (await readDiagnostics(session.page));
+  diagnostics.console = [...session.consoleLogs];
+  diagnostics.pageErrors = [...session.pageErrors];
+  await session.page.screenshot({ path: join(diagnosticsDir, `${prefix}-screenshot.png`), fullPage: true });
+  await session.context.tracing.stop({ path: join(diagnosticsDir, `${prefix}-trace.zip`) });
+  return diagnostics;
+}
+
+export async function closePeer(session: PeerSession): Promise<void> {
+  await session.context.close();
+}
+
+export function createTempUserDataDir(prefix: string): string {
+  return mkdtempSync(join(tmpdir(), prefix));
+}
+
+export function removeTempUserDataDir(path: string): void {
+  rmSync(path, { recursive: true, force: true });
+}
+
+export function resolveConnectSequence(order: ConnectOrder): Array<"peer_a" | "peer_b"> {
+  return order === "peer_a_first" ? ["peer_a", "peer_b"] : ["peer_b", "peer_a"];
+}
+
+export async function runConnectOrder(
+  order: ConnectOrder,
+  peerA: PeerSession,
+  peerB: PeerSession,
+): Promise<void> {
+  for (const next of resolveConnectSequence(order)) {
+    await connectPeer(next === "peer_a" ? peerA.page : peerB.page);
+  }
+}
+
+export async function synchronizedObservationStart(peerA: PeerSession, peerB: PeerSession): Promise<number> {
+  const startedAt = Date.now();
+  await startObservation(peerA.page);
+  await sleep(250);
+  await startObservation(peerB.page);
+  return Date.now() - startedAt;
+}
+
+export function assertObservationStartWindow(deltaMs: number, maxMs: number): void {
+  if (deltaMs > maxMs) {
+    throw new Error(`observation start delta ${deltaMs}ms exceeds ${maxMs}ms`);
+  }
+}
+
+export function evaluatePeerReadyGuardFailures(
+  diagnostics: PeerDiagnostics,
+  role: "peer_a" | "peer_b",
+): string[] {
+  const failures: string[] = [];
+  if (diagnostics.rtpPreflight?.state !== "available") {
+    failures.push(`${role} RTP preflight not available`);
+  }
+  if (diagnostics.connection !== "connected") {
+    failures.push(`${role} connection not connected`);
+  }
+  if (diagnostics.ice !== "connected" && diagnostics.ice !== "completed") {
+    failures.push(`${role} ICE not connected`);
+  }
+  if (diagnostics.dataChannel !== "open") {
+    failures.push(`${role} DataChannel not open`);
+  }
+  if (!diagnostics.probes || Number(diagnostics.probes) < 1) {
+    failures.push(`${role} clock preflight incomplete`);
+  }
+  if (diagnostics.remoteTrackLive !== true) {
+    failures.push(`${role} remote audio track missing`);
+  }
+  return failures;
+}
+
+export async function assertPeerReadyGuards(peer: PeerSession): Promise<void> {
+  const diagnostics = await readDiagnostics(peer.page);
+  const failures = evaluatePeerReadyGuardFailures(diagnostics, peer.role);
+  if (failures.length > 0) {
+    throw new Error(failures[0] ?? `${peer.role} ready guard failed`);
+  }
+}
+
+export function assertEndpointNegotiationRoles(peerAPath: string, peerBPath: string): void {
+  const peerA = JSON.parse(readFileSync(peerAPath, "utf8")) as {
+    peerRole?: string;
+    dataChannel?: { owner?: boolean };
+  };
+  const peerB = JSON.parse(readFileSync(peerBPath, "utf8")) as {
+    peerRole?: string;
+    dataChannel?: { owner?: boolean };
+  };
+  if (peerA.peerRole !== "peer_a" || peerB.peerRole !== "peer_b") {
+    throw new Error("exported endpoint roles do not match peer_a / peer_b");
+  }
+  if (peerA.dataChannel?.owner !== true) {
+    throw new Error("peer_a must own the initial DataChannel offer");
+  }
+  if (peerB.dataChannel?.owner !== false) {
+    throw new Error("peer_b must not originate the initial DataChannel offer");
+  }
+}
+
+export async function assertPeerReadyStates(peerA: PeerSession, peerB: PeerSession): Promise<void> {
+  await waitForBothPeersReadyOrExhausted(peerA, peerB);
+  await assertPeerReadyGuards(peerA);
+  await assertPeerReadyGuards(peerB);
+}
+
+export async function assertPeerCompletedStates(peerA: PeerSession, peerB: PeerSession): Promise<void> {
+  await Promise.all([waitForCompleted(peerA.page), waitForCompleted(peerB.page)]);
+}
+
+export async function saveDownloads(peerA: PeerSession, peerB: PeerSession, peerAPath: string, peerBPath: string) {
+  await exportFinalized(peerA.page, peerAPath);
+  await exportFinalized(peerB.page, peerBPath);
+}
+
+export type { Download };

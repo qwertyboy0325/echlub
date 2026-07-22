@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "echlub.performance.live-artifact-manifest/v1",
+  "algorithm": "blake3",
+  "pairId": "pair-0123456789abcdef",
+  "sessionCorrelationId": "0123456789abcdef0123456789abcdef",
+  "softwareCommit": "e4198657264a6b4629948469dcdabde21a3eaa34",
+  "artifacts": []
+}

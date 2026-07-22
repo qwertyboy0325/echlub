@@ -20,6 +20,16 @@ def run(label: str, cmd: list[str]) -> bool:
     return True
 
 
+def run_expect_fail(label: str, cmd: list[str]) -> bool:
+    print(f"\n==> {label} (expect fail)")
+    result = subprocess.run(cmd, cwd=ROOT)
+    if result.returncode == 0:
+        print(f"FAILED: {label} should have failed", file=sys.stderr)
+        return False
+    print(f"OK: {label} failed as expected")
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-references", action="store_true")
@@ -69,13 +79,234 @@ def main() -> int:
                     "test-vectors/performance/harness-validation-v1.json",
                 ],
             ),
+            (
+                "performance assess vector",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "assess-synthetic",
+                    "test-vectors/performance/synthetic-media-path-v1.json",
+                ],
+            ),
+            (
+                "performance zero-detection structural fixture",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate",
+                    "test-vectors/performance/synthetic-zero-detection-v1.json",
+                ],
+            ),
+            (
+                "performance zero-detection assess fail",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "assess-synthetic",
+                    "test-vectors/performance/synthetic-zero-detection-v1.json",
+                ],
+            ),
+            (
+                "live endpoint draft vector",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-draft",
+                    "test-vectors/performance/live-endpoint-peer-a-v1.json",
+                ],
+            ),
+            (
+                "live finalized positive fixture",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-finalized-peer-a-v1.json",
+                ],
+            ),
+            (
+                "live invalid clock-only fixture reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-invalid-clock-only-v1.json",
+                ],
+            ),
+            (
+                "live timestamp reversal fixture reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-timestamp-reversal-v1.json",
+                ],
+            ),
+            (
+                "live draft-as-final reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-draft-as-final-v1.json",
+                ],
+            ),
+            (
+                "live directory manifest verification",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "verify-live-directory",
+                    "test-vectors/performance/live-directory-v1",
+                ],
+            ),
+            (
+                "live dual-browser harness unit tests",
+                [
+                    "corepack",
+                    "pnpm",
+                    "--filter",
+                    "@echlub/live-dual-browser-harness",
+                    "test",
+                ],
+            ),
+            (
+                "live cross-clock +500 fixture",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-cross-clock-plus-500-v1.json",
+                ],
+            ),
+            (
+                "live cross-clock -500 fixture",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-cross-clock-minus-500-v1.json",
+                ],
+            ),
+            (
+                "live missing responder fixture reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-missing-responder-v1.json",
+                ],
+            ),
+            (
+                "live datachannel closed fixture reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-datachannel-closed-v1.json",
+                ],
+            ),
+            (
+                "live empty manifest reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "verify-live-directory",
+                    "test-vectors/performance/live-directory-empty-manifest-v1",
+                ],
+            ),
+            (
+                "live missing manifest entry reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "verify-live-directory",
+                    "test-vectors/performance/live-directory-missing-entry-v1",
+                ],
+            ),
+            (
+                "live path traversal manifest reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "verify-live-directory",
+                    "test-vectors/performance/live-directory-path-traversal-v1",
+                ],
+            ),
         ]
     )
+
+    expect_fail_labels = {
+        "performance zero-detection assess fail",
+        "live invalid clock-only fixture reject",
+        "live timestamp reversal fixture reject",
+        "live draft-as-final reject",
+        "live missing responder fixture reject",
+        "live datachannel closed fixture reject",
+        "live empty manifest reject",
+        "live missing manifest entry reject",
+        "live path traversal manifest reject",
+    }
 
     if not args.skip_references:
         steps.append(("reference cleanliness (end)", ["python3", "scripts/check-references.py"]))
 
-    failed = [label for label, cmd in steps if not run(label, cmd)]
+    failed = []
+    for label, cmd in steps:
+        if label in expect_fail_labels:
+            ok = run_expect_fail(label, cmd)
+        else:
+            ok = run(label, cmd)
+        if not ok:
+            failed.append(label)
     print("\n=== Verification summary ===")
     if failed:
         print("FAILED steps:")

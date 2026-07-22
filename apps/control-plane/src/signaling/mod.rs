@@ -7,10 +7,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::config::validate_origin;
+
 const MAX_MESSAGE_BYTES: usize = 16_384;
 const MAX_PEERS_PER_SESSION: usize = 2;
 const MAX_SESSION_ID_LEN: usize = 64;
 const MAX_PEER_ID_LEN: usize = 64;
+const ALLOWED_RELAY_TYPES: &[&str] = &["description", "ice_candidate", "control", "relay"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -43,23 +46,38 @@ pub struct SignalingQuery {
     pub peer_id: String,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct SignalingState {
     inner: Arc<Mutex<HashMap<String, SessionRoom>>>,
+    extra_origins: Arc<Vec<String>>,
 }
 
 struct SessionRoom {
     peers: HashMap<String, tokio::sync::broadcast::Sender<String>>,
 }
 
-pub fn validate_origin(headers: &HeaderMap) -> bool {
-    match headers.get("origin").and_then(|v| v.to_str().ok()) {
-        Some(origin) => {
-            origin.starts_with("http://localhost")
-                || origin.starts_with("http://127.0.0.1")
-                || origin.starts_with("https://localhost")
-                || origin.starts_with("https://127.0.0.1")
+impl SignalingState {
+    pub fn new(extra_origins: Vec<String>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            extra_origins: Arc::new(extra_origins),
         }
+    }
+
+    pub fn default_with_origins(extra_origins: Vec<String>) -> Self {
+        Self::new(extra_origins)
+    }
+}
+
+impl Default for SignalingState {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
+pub fn validate_origin_header(headers: &HeaderMap, extra_origins: &[String]) -> bool {
+    match headers.get("origin").and_then(|v| v.to_str().ok()) {
+        Some(origin) => validate_origin(origin, extra_origins),
         None => true,
     }
 }
@@ -81,13 +99,40 @@ pub fn validate_ids(session_id: &str, peer_id: &str) -> Result<(), (StatusCode, 
     Ok(())
 }
 
+pub fn validate_relay_envelope(text: &str) -> Result<serde_json::Value, &'static str> {
+    if text.len() > MAX_MESSAGE_BYTES {
+        return Err("oversized payload");
+    }
+    let value: serde_json::Value =
+        serde_json::from_str(text).map_err(|_| "malformed relay envelope")?;
+    let msg_type = value
+        .get("type")
+        .and_then(|v| v.as_str())
+        .ok_or("missing relay type")?;
+    if !ALLOWED_RELAY_TYPES.contains(&msg_type) {
+        return Err("unsupported relay type");
+    }
+    if msg_type == "relay" {
+        let payload = value.get("payload").ok_or("malformed relay envelope")?;
+        let inner_type = payload
+            .get("type")
+            .and_then(|v| v.as_str())
+            .ok_or("missing relay type")?;
+        if !["description", "ice_candidate", "control", "offer", "answer"].contains(&inner_type) {
+            return Err("unsupported relay type");
+        }
+        return Ok(payload.clone());
+    }
+    Ok(value)
+}
+
 pub async fn signaling_ws_handler(
     ws: axum::extract::WebSocketUpgrade,
     Query(query): Query<SignalingQuery>,
     State(state): State<SignalingState>,
     headers: HeaderMap,
 ) -> Response {
-    if !validate_origin(&headers) {
+    if !validate_origin_header(&headers, &state.extra_origins) {
         return (StatusCode::FORBIDDEN, "origin not allowed").into_response();
     }
     if let Err((status, msg)) = validate_ids(&query.session_id, &query.peer_id) {
@@ -96,17 +141,23 @@ pub async fn signaling_ws_handler(
     ws.on_upgrade(move |socket| handle_socket(socket, state, query))
 }
 
+#[derive(Debug)]
+struct JoinResult {
+    rx: tokio::sync::broadcast::Receiver<String>,
+    existing_peer_ids: Vec<String>,
+}
+
 async fn handle_socket(socket: WebSocket, state: SignalingState, query: SignalingQuery) {
     let session_id = query.session_id;
     let peer_id = query.peer_id;
 
-    let mut rx = match join_room(&state, &session_id, &peer_id) {
-        Ok(rx) => rx,
-        Err(msg) => {
+    let join_result = match join_room(&state, &session_id, &peer_id) {
+        Ok(result) => result,
+        Err(code) => {
             let (mut sender, _) = socket.split();
             let err = SignalingMessage::Error {
-                code: "session_full".into(),
-                message: msg,
+                code: code.to_string(),
+                message: code.to_string(),
             };
             let _ = sender
                 .send(Message::Text(serde_json::to_string(&err).unwrap().into()))
@@ -115,6 +166,7 @@ async fn handle_socket(socket: WebSocket, state: SignalingState, query: Signalin
         }
     };
 
+    let mut rx = join_result.rx;
     let (mut sender, mut receiver) = socket.split();
 
     let join_msg = SignalingMessage::Join {
@@ -131,15 +183,37 @@ async fn handle_socket(socket: WebSocket, state: SignalingState, query: Signalin
         return;
     }
 
+    for existing_peer_id in join_result.existing_peer_ids {
+        let existing_joined = SignalingMessage::PeerJoined {
+            peer_id: existing_peer_id,
+        };
+        if sender
+            .send(Message::Text(
+                serde_json::to_string(&existing_joined).unwrap().into(),
+            ))
+            .await
+            .is_err()
+        {
+            remove_peer(&state, &session_id, &peer_id);
+            return;
+        }
+    }
+
     loop {
         tokio::select! {
             incoming = receiver.next() => {
                 match incoming {
                     Some(Ok(Message::Text(text))) => {
-                        if text.len() > MAX_MESSAGE_BYTES {
-                            continue;
+                        match validate_relay_envelope(text.as_ref()) {
+                            Ok(payload) => relay_message(&state, &session_id, &peer_id, payload),
+                            Err(code) => {
+                                let err = SignalingMessage::Error {
+                                    code: code.to_string(),
+                                    message: code.to_string(),
+                                };
+                                let _ = sender.send(Message::Text(serde_json::to_string(&err).unwrap().into())).await;
+                            }
                         }
-                        relay_message(&state, &session_id, &peer_id, text.as_ref());
                     }
                     Some(Ok(Message::Close(_))) | None => break,
                     _ => {}
@@ -166,7 +240,7 @@ fn join_room(
     state: &SignalingState,
     session_id: &str,
     peer_id: &str,
-) -> Result<tokio::sync::broadcast::Receiver<String>, String> {
+) -> Result<JoinResult, &'static str> {
     let mut rooms = state.inner.lock().unwrap();
     let room = rooms
         .entry(session_id.to_string())
@@ -174,10 +248,15 @@ fn join_room(
             peers: HashMap::new(),
         });
 
-    if room.peers.len() >= MAX_PEERS_PER_SESSION && !room.peers.contains_key(peer_id) {
-        return Err(format!("max {MAX_PEERS_PER_SESSION} peers per session"));
+    if room.peers.contains_key(peer_id) {
+        return Err("duplicate peer");
     }
 
+    if room.peers.len() >= MAX_PEERS_PER_SESSION {
+        return Err("session_full");
+    }
+
+    let existing_peer_ids: Vec<String> = room.peers.keys().cloned().collect();
     let (tx, rx) = tokio::sync::broadcast::channel(32);
     room.peers.insert(peer_id.to_string(), tx.clone());
 
@@ -191,11 +270,13 @@ fn join_room(
         }
     }
 
-    Ok(rx)
+    Ok(JoinResult {
+        rx,
+        existing_peer_ids,
+    })
 }
 
-fn relay_message(state: &SignalingState, session_id: &str, from: &str, text: &str) {
-    let payload: serde_json::Value = serde_json::from_str(text).unwrap_or_default();
+fn relay_message(state: &SignalingState, session_id: &str, from: &str, payload: serde_json::Value) {
     let relay = SignalingMessage::Relay {
         from: from.to_string(),
         payload,
@@ -240,12 +321,87 @@ mod tests {
     }
 
     #[test]
-    fn validate_ids_accepts_valid() {
-        assert!(validate_ids("session-1", "peer_a").is_ok());
+    fn validate_relay_rejects_oversized() {
+        let big = "a".repeat(MAX_MESSAGE_BYTES + 1);
+        assert_eq!(
+            validate_relay_envelope(&big).unwrap_err(),
+            "oversized payload"
+        );
+    }
+
+    #[test]
+    fn validate_relay_accepts_description() {
+        let payload = validate_relay_envelope(
+            r#"{"type":"relay","payload":{"type":"description","sdp":{"type":"offer","sdp":"x"}}}"#,
+        );
+        assert!(payload.is_ok());
     }
 
     #[test]
     fn max_peers_is_two() {
         assert_eq!(MAX_PEERS_PER_SESSION, 2);
+    }
+
+    #[tokio::test]
+    async fn peer_a_first_notifies_joiner_of_existing_peer_b() {
+        let state = SignalingState::default();
+        let session = "session-1";
+
+        let join_b = join_room(&state, session, "peer_b").expect("peer_b joins");
+        assert!(join_b.existing_peer_ids.is_empty());
+        let mut rx_b = join_b.rx;
+
+        let join_a = join_room(&state, session, "peer_a").expect("peer_a joins");
+        assert_eq!(join_a.existing_peer_ids, vec!["peer_b"]);
+
+        let msg = tokio::time::timeout(std::time::Duration::from_secs(1), rx_b.recv())
+            .await
+            .expect("timed out waiting for peer_joined")
+            .expect("broadcast closed");
+        let parsed: SignalingMessage = serde_json::from_str(&msg).unwrap();
+        match parsed {
+            SignalingMessage::PeerJoined { peer_id } => assert_eq!(peer_id, "peer_a"),
+            other => panic!("expected peer_joined, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn peer_b_first_notifies_peer_a_of_existing_peer_b() {
+        let state = SignalingState::default();
+        let session = "session-1";
+
+        let join_b = join_room(&state, session, "peer_b").expect("peer_b joins");
+        assert!(join_b.existing_peer_ids.is_empty());
+
+        let join_a = join_room(&state, session, "peer_a").expect("peer_a joins");
+        assert_eq!(join_a.existing_peer_ids, vec!["peer_b"]);
+    }
+
+    #[test]
+    fn duplicate_join_rejected() {
+        let state = SignalingState::default();
+        let session = "session-1";
+        assert!(join_room(&state, session, "peer_a").is_ok());
+        assert_eq!(
+            join_room(&state, session, "peer_a").unwrap_err(),
+            "duplicate peer"
+        );
+    }
+
+    #[test]
+    fn third_peer_rejected_and_room_cleaned_after_leave() {
+        let state = SignalingState::default();
+        let session = "session-1";
+        let join_a = join_room(&state, session, "peer_a").expect("peer_a joins");
+        let join_b = join_room(&state, session, "peer_b").expect("peer_b joins");
+        assert_eq!(
+            join_room(&state, session, "peer_c").unwrap_err(),
+            "session_full"
+        );
+        drop(join_a.rx);
+        drop(join_b.rx);
+        remove_peer(&state, session, "peer_a");
+        remove_peer(&state, session, "peer_b");
+        assert!(state.inner.lock().unwrap().get(session).is_none());
     }
 }

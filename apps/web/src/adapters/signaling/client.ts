@@ -7,6 +7,7 @@ export interface SignalingClientOptions {
   onMessage: (payload: unknown) => void;
   onPeerJoined?: (peerId: string) => void;
   onPeerLeft?: (peerId: string) => void;
+  onConnected?: () => void;
   onError?: (error: string) => void;
 }
 
@@ -23,6 +24,10 @@ export class SignalingClient {
     const url = `${base}?session_id=${encodeURIComponent(this.options.sessionId)}&peer_id=${encodeURIComponent(this.options.peerId)}`;
     this.ws = new WebSocket(url);
 
+    this.ws.onopen = () => {
+      this.options.onConnected?.();
+    };
+
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data as string) as {
@@ -33,7 +38,9 @@ export class SignalingClient {
         };
         switch (msg.type) {
           case "peer_joined":
-            this.options.onPeerJoined?.(msg.peer_id ?? "");
+            if (msg.peer_id && msg.peer_id !== this.options.peerId) {
+              this.options.onPeerJoined?.(msg.peer_id);
+            }
             break;
           case "peer_left":
             this.options.onPeerLeft?.(msg.peer_id ?? "");

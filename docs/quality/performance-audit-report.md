@@ -1,5 +1,7 @@
 # Performance Baseline Audit Report
 
+> **Supersession note (2026-07-21):** This report reflects ECHLUB-PERFORMANCE-BASELINE-01 only. Re-audit ECHLUB-PERFORMANCE-LAB-REAUDIT-CORRECTION-01 found CORRECTIONS REQUIRED — see `performance-lab-reaudit-report.md` and `performance-baseline-reassessment.md`. Original synthetic artifacts reclassified as FAILED_OBSERVATION.
+
 Audit: ECHLUB-PERFORMANCE-BASELINE-01 (read-only)
 
 ## Verdict: PASS

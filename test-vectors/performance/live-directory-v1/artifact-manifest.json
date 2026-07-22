@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "echlub.performance.live-artifact-manifest/v1",
+  "algorithm": "blake3",
+  "pairId": "pair-0123456789abcdef",
+  "sessionCorrelationId": "0123456789abcdef0123456789abcdef",
+  "softwareCommit": "e4198657264a6b4629948469dcdabde21a3eaa34",
+  "artifacts": [
+    {
+      "filename": "peer-a.validated.json",
+      "checksum": "cd3c6f5fedc4509d940ee212899e7ed1bf56e19b2012b295a98538d24d908526",
+      "artifactRole": "live-endpoint-validated-peer-a"
+    },
+    {
+      "filename": "peer-b.validated.json",
+      "checksum": "ab3bb16a62a07c6845cae936552130577d2d402fe1a0a67fea1da8bb94a9b347",
+      "artifactRole": "live-endpoint-validated-peer-b"
+    },
+    {
+      "filename": "peer-a.summary.json",
+      "checksum": "40349222eb229b410aedc00860f433b827511a1d042e6fbad6cd4444b30a2978",
+      "artifactRole": "live-endpoint-summary-peer-a"
+    },
+    {
+      "filename": "peer-b.summary.json",
+      "checksum": "40349222eb229b410aedc00860f433b827511a1d042e6fbad6cd4444b30a2978",
+      "artifactRole": "live-endpoint-summary-peer-b"
+    },
+    {
+      "filename": "pair-summary.json",
+      "checksum": "94023386d0aa682a8663ac4929601b95a61d5bf08e4c31a7b58eed50a03320b1",
+      "artifactRole": "live-observation-pair-summary"
+    },
+    {
+      "filename": "report.md",
+      "checksum": "53fb3ef87add2a8b2d9e858b3f73b766dc31e1c2ef09bb6aff98aeb3c1f10cb6",
+      "artifactRole": "live-pair-report"
+    }
+  ]
+}

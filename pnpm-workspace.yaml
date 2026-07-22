@@ -1,3 +1,4 @@
 packages:
   - apps/web
   - tools/performance-browser-harness
+  - tools/live-dual-browser-harness

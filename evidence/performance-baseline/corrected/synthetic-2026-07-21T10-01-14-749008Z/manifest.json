@@ -1,0 +1,15 @@
+{
+  "runId": "synthetic-2026-07-21T10-01-14-749008Z",
+  "artifact": "observation.json",
+  "artifacts": {
+    "observation.json": "historical-checksum-not-recalculated"
+  },
+  "validatePass": true,
+  "assessPass": true,
+  "active": false,
+  "superseded": true,
+  "supersededReason": "RTP byte progression is not pulse detection; superseded by decoded-media detector requirement",
+  "observationValidity": "harness-limited-or-observation-invalid",
+  "evidenceStatus": "exploratory_non_authoritative",
+  "correctedObservation": true
+}

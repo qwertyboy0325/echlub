@@ -3,12 +3,12 @@
   "evidenceLevel": "browser_synthetic_media_path",
   "evidenceStatus": "exploratory_non_authoritative",
   "metadata": {
-    "runId": "vector-synthetic-v1-001",
+    "runId": "vector-synthetic-media-path-001",
     "startedAt": "2026-07-21T08:00:00Z",
     "completedAt": "2026-07-21T08:00:05Z",
-    "harnessVersion": "0.1.0",
+    "harnessVersion": "0.2.0",
     "browserFamily": "chromium",
-    "platform": "darwin"
+    "platform": "test"
   },
   "timing": {
     "pulseEmitMs": { "kind": "observed", "value": 1.5 },
@@ -19,16 +19,16 @@
     "connectionSetupMs": { "kind": "observed", "value": 350.0 }
   },
   "syntheticPulse": {
-    "pulsesEmitted": { "kind": "observed", "value": 10 },
-    "pulsesDetected": { "kind": "observed", "value": 10 },
+    "pulsesEmitted": { "kind": "observed", "value": 5.0 },
+    "pulsesDetected": { "kind": "observed", "value": 5.0 },
     "detectionRate": { "kind": "observed", "value": 1.0 },
     "meanDetectionLatencyMs": { "kind": "observed", "value": 45.0 },
     "jitterMs": { "kind": "observed", "value": 3.2 }
   },
   "transport": {
-    "candidatePairType": { "kind": "observed", "value": 1 },
-    "bytesSent": { "kind": "observed", "value": 4096 },
-    "bytesReceived": { "kind": "observed", "value": 4096 },
-    "packetsLost": { "kind": "observed", "value": 0 }
+    "candidatePairType": { "kind": "unsupported" },
+    "bytesSent": { "kind": "observed", "value": 4096.0 },
+    "bytesReceived": { "kind": "observed", "value": 4096.0 },
+    "packetsLost": { "kind": "observed", "value": 0.0 }
   }
 }

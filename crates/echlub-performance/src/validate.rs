@@ -107,6 +107,7 @@ pub fn validate_run(json: &str) -> ValidationResult {
     }
 
     check_zero_filled_metrics(&value, &mut errors);
+    check_failed_path_zero_observed(&value, &mut errors);
 
     if errors.is_empty() {
         ValidationResult::ok()
@@ -118,10 +119,12 @@ pub fn validate_run(json: &str) -> ValidationResult {
 fn check_zero_filled_metrics(value: &Value, errors: &mut Vec<ValidationError>) {
     fn walk(val: &Value, path: &str, errors: &mut Vec<ValidationError>) {
         if let Some(obj) = val.as_object() {
-            if obj.get("kind").and_then(|k| k.as_str()) == Some("observed") {
-                if let Some(v) = obj.get("value").and_then(|v| v.as_f64()) {
-                    if v == 0.0 && path.contains("Unavailable") {
-                        errors.push(ValidationError::ZeroFilledMetric(path.to_string()));
+            if obj.get("kind").and_then(|k| k.as_str()) == Some("unavailable") {
+                if let Some(v) = obj.get("value") {
+                    if v.is_number() {
+                        errors.push(ValidationError::ZeroFilledMetric(format!(
+                            "{path}: unavailable metric must not carry value"
+                        )));
                     }
                 }
             }
@@ -135,6 +138,34 @@ fn check_zero_filled_metrics(value: &Value, errors: &mut Vec<ValidationError>) {
         }
     }
     walk(value, "", errors);
+}
+
+fn check_failed_path_zero_observed(value: &Value, errors: &mut Vec<ValidationError>) {
+    let pulses_detected = value
+        .pointer("/syntheticPulse/pulsesDetected/value")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+
+    if pulses_detected > 0.0 {
+        return;
+    }
+
+    let suspicious_paths = [
+        "/timing/pulseDetectMs",
+        "/timing/loopbackLatencyMs",
+        "/syntheticPulse/meanDetectionLatencyMs",
+        "/syntheticPulse/jitterMs",
+    ];
+
+    for path in suspicious_paths {
+        if let Some(metric) = value.pointer(path) {
+            if metric.get("kind").and_then(|k| k.as_str()) == Some("observed")
+                && metric.get("value").and_then(|v| v.as_f64()) == Some(0.0)
+            {
+                errors.push(ValidationError::ZeroFilledMetric(path.to_string()));
+            }
+        }
+    }
 }
 
 pub fn parse_and_validate(json: &str) -> Result<PerformanceRunV1, ValidationResult> {

@@ -1,0 +1,19 @@
+{
+  "name": "@echlub/live-dual-browser-harness",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "e2e": "tsx src/run.ts",
+    "test": "vitest run",
+    "generate-wav": "tsx src/generate-wav.ts"
+  },
+  "dependencies": {
+    "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "runId": "synthetic-2026-07-21T11-03-34-041683Z",
+  "artifacts": {
+    "observation.json": "be762a7b99704c351d308348bc30e8f2e801081934700c8e3abda8536f998695",
+    "report.md": "fce69a2d3c49a77b54075016f766acedd053cce39224a5e0a3ae4843567049e5"
+  },
+  "validatePass": true,
+  "assessPass": false,
+  "active": false,
+  "superseded": true,
+  "evidenceStatus": "exploratory_non_authoritative",
+  "correctedObservation": true,
+  "supersededReason": "decoded pulse detection did not pass assessment threshold"
+}

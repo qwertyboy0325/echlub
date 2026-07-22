@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "PerformanceBaselineManifestV1",
+  "evidenceStatus": "exploratory_non_authoritative",
+  "historicalArtifacts": {
+    "classification": "FAILED_OBSERVATION",
+    "paths": [
+      "synthetic-2026-07-21T08-29-29-791Z.json",
+      "synthetic-2026-07-21T08-29-43-818Z.json"
+    ],
+    "reassessmentDoc": "docs/quality/performance-baseline-reassessment.md"
+  },
+  "correctedRuns": [
+    {
+      "runId": "synthetic-2026-07-21T10-01-14-749008Z",
+      "directory": "corrected/synthetic-2026-07-21T10-01-14-749008Z",
+      "validatePass": true,
+      "assessPass": true,
+      "active": false,
+      "superseded": true,
+      "supersededReason": "RTP byte progression is not pulse detection; superseded by decoded-media detector requirement",
+      "observationValidity": "harness-limited-or-observation-invalid"
+    },
+    {
+      "runId": "synthetic-2026-07-21T11-03-34-041683Z",
+      "directory": "corrected/synthetic-2026-07-21T11-03-34-041683Z",
+      "validatePass": true,
+      "assessPass": false,
+      "active": false,
+      "superseded": true,
+      "latestOutcome": "HARNESS_LIMITATION",
+      "decodedPulsesDetected": "0/5",
+      "supersededReason": "decoded pulse detection did not pass assessment threshold"
+    }
+  ],
+  "activeCorrectedObservation": null,
+  "latestSyntheticOutcome": "HARNESS_LIMITATION",
+  "latestSyntheticDecodedPulses": "0/5"
+}
