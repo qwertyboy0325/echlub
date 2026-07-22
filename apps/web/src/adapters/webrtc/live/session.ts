@@ -4,7 +4,11 @@ import {
   computeClockMedian,
   validLocalCompletedProbes,
 } from "./clock-probe";
-import { collectStatsPreflight, hasRtpAudioCounterAvailability } from "./stats-sampler";
+import {
+  DEFAULT_RTP_PREFLIGHT_CONFIG,
+  RtpStatsPreflightController,
+  type RtpPreflightDiagnostics,
+} from "./stats-preflight";
 import {
   applySignalingDescription,
   createAndSendOffer,
@@ -59,9 +63,7 @@ export class LiveWebRtcSession {
   private connectionLifecycle: Record<string, unknown> = {};
   private playoutState: Record<string, unknown> = {};
   private captureState: Record<string, unknown> = {};
-  private statsPreflightComplete = false;
-  private statsPreflightStarted = false;
-  private statsPreflightHasRtpAudio = false;
+  private statsPreflight: RtpStatsPreflightController | null = null;
   private peerNegotiationStarted = false;
 
   private static readonly MIN_FINALIZED_STATS = 30;
@@ -110,6 +112,7 @@ export class LiveWebRtcSession {
     this.assertNotStopped();
     this.setPhase("signaling_connecting");
     this.pc = new RTCPeerConnection({ iceServers: [] });
+    this.resetStatsPreflight();
     this.audioTransceiver = this.pc.addTransceiver("audio", { direction: "sendrecv" });
 
     if (this.localStream) {
@@ -138,6 +141,7 @@ export class LiveWebRtcSession {
       onPeerJoined: (peerId) => this.handlePeerJoined(peerId),
       onPeerLeft: () => {
         this.peerPresent = false;
+        this.resetStatsPreflight();
       },
       onError: this.callbacks.onError,
     });
@@ -293,6 +297,7 @@ export class LiveWebRtcSession {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
+    this.cancelStatsPreflight("session stopped");
     this.clockEngine?.stop();
     this.statsSampler?.stop();
     this.localStream?.getTracks().forEach((t) => t.stop());
@@ -314,6 +319,10 @@ export class LiveWebRtcSession {
     return this.phase;
   }
 
+  getRtpPreflightDiagnostics(): RtpPreflightDiagnostics | null {
+    return this.statsPreflight?.getDiagnostics() ?? null;
+  }
+
   private wirePeerConnection(pc: RTCPeerConnection): void {
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
@@ -322,11 +331,22 @@ export class LiveWebRtcSession {
       if (state === "connected") {
         this.setPhase("connected");
         this.evaluateReadyToObserve();
+      } else if (state === "disconnected" || state === "failed" || state === "closed") {
+        this.cancelStatsPreflight(`peer connection ${state}`);
       }
     };
     pc.oniceconnectionstatechange = () => {
       this.connectionLifecycle.iceConnectionState = pc.iceConnectionState;
       this.callbacks.onIceState(pc.iceConnectionState);
+      if (
+        pc.iceConnectionState === "disconnected" ||
+        pc.iceConnectionState === "failed" ||
+        pc.iceConnectionState === "closed"
+      ) {
+        this.cancelStatsPreflight(`ICE ${pc.iceConnectionState}`);
+      } else {
+        this.evaluateReadyToObserve();
+      }
     };
     pc.onsignalingstatechange = () => {
       this.connectionLifecycle.signalingState = pc.signalingState;
@@ -386,6 +406,7 @@ export class LiveWebRtcSession {
     channel.onclose = () => {
       this.setDataChannelReadyState("closed");
       this.callbacks.onDataChannelState("closed");
+      this.cancelStatsPreflight("data channel closed");
     };
     channel.onerror = () => {
       this.setDataChannelReadyState("closed");
@@ -464,6 +485,9 @@ export class LiveWebRtcSession {
         !this.negotiation.makingOffer
       ) {
         this.peerNegotiationStarted = false;
+        if (this.peerPresent) {
+          this.setPhase("peer_present");
+        }
       }
       const message = error instanceof Error ? error.message : String(error);
       this.callbacks.onError(`initial negotiation failed (${trigger}): ${message}`);
@@ -500,26 +524,43 @@ export class LiveWebRtcSession {
     }
   }
 
+  private canStartStatsPreflight(): boolean {
+    if (this.stopped || !this.pc) return false;
+    if (this.pc.connectionState !== "connected") return false;
+    const ice = this.pc.iceConnectionState;
+    if (ice !== "connected" && ice !== "completed") return false;
+    if (this.dc?.readyState !== "open") return false;
+    const remoteTrack = this.remoteStream?.getAudioTracks()[0];
+    if (!remoteTrack || remoteTrack.readyState !== "live") return false;
+    return true;
+  }
+
+  private resetStatsPreflight(): void {
+    this.statsPreflight?.reset();
+    this.statsPreflight = null;
+  }
+
+  private cancelStatsPreflight(reason: string): void {
+    this.statsPreflight?.cancel(reason);
+  }
+
   private ensureStatsPreflight(): void {
-    if (this.statsPreflightComplete || this.statsPreflightStarted || !this.pc) return;
-    if (this.pc.connectionState !== "connected") return;
-    if (this.dc?.readyState !== "open") return;
-    this.statsPreflightStarted = true;
-    void collectStatsPreflight(this.pc)
-      .then((sample) => {
-        if (!this.statsPreflightComplete) {
-          this.statsPreflightComplete = true;
-          this.statsPreflightHasRtpAudio = hasRtpAudioCounterAvailability(sample);
-          this.statsSamples.push(sample);
-          this.callbacks.onStatsSample(sample);
-        }
-      })
-      .catch(() => {
-        this.statsPreflightStarted = false;
-      })
-      .finally(() => {
-        this.evaluateReadyToObserve();
-      });
+    if (!this.canStartStatsPreflight()) {
+      if (this.statsPreflight?.getState() === "probing") {
+        this.cancelStatsPreflight("preflight prerequisites lost");
+      }
+      return;
+    }
+    if (!this.statsPreflight && this.pc) {
+      this.statsPreflight = new RtpStatsPreflightController(
+        this.pc,
+        DEFAULT_RTP_PREFLIGHT_CONFIG,
+        {
+          onUpdate: () => this.evaluateReadyToObserve(),
+        },
+      );
+    }
+    this.statsPreflight?.maybeStart();
   }
 
   private assertReadyToObserve(): void {
@@ -547,9 +588,13 @@ export class LiveWebRtcSession {
     if (this.dc?.readyState !== "open") failures.push("data channel not open");
     const localProbes = validLocalCompletedProbes(this.clockSamples, this.config.localPeerId);
     if (localProbes.length < 1) failures.push("clock preflight incomplete");
-    if (!this.statsPreflightComplete) failures.push("stats preflight incomplete");
-    if (this.statsPreflightComplete && !this.statsPreflightHasRtpAudio) {
-      failures.push("genuine RTP audio stats unavailable");
+    const preflightState = this.statsPreflight?.getState() ?? "idle";
+    if (preflightState !== "available") {
+      if (preflightState === "exhausted") {
+        failures.push("genuine RTP audio stats unavailable");
+      } else {
+        failures.push("stats preflight incomplete");
+      }
     }
     const commit = this.config.softwareCommit?.trim();
     if (!commit || !LiveWebRtcSession.COMMIT_SHA40.test(commit)) {
@@ -584,4 +629,5 @@ function remoteAudioStreamFromReceivers(pc: RTCPeerConnection): MediaStream | nu
   return tracks.length > 0 ? new MediaStream(tracks) : null;
 }
 
+export type { RtpPreflightDiagnostics };
 export type { LiveSessionConfig, LiveSessionCallbacks, PeerRole, CaptureProfile, ObservationConfig };

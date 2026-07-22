@@ -222,12 +222,15 @@ describe("ready timeout guards", () => {
     const { waitForReady } = await import("../src/peer-runner.js");
     const page = {
       locator: () => ({
+        innerText: vi.fn(async () => "Phase: Connected\nConnection: connected | ICE: connected | DataChannel: open"),
+        allTextContents: vi.fn(async () => []),
         getByText: () => ({
           waitFor: vi.fn(async () => {
             throw new Error("Timeout");
           }),
         }),
       }),
+      evaluate: vi.fn(async () => null),
     };
     await expect(waitForReady(page as never, 10)).rejects.toThrow(/Timeout/);
   });

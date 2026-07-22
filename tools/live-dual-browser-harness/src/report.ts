@@ -1,4 +1,4 @@
-import { AUTOMATION_SCHEMA_VERSION, type AutomationResult, type ConnectOrder } from "./constants.js";
+import { AUTOMATION_SCHEMA_VERSION, type AutomationResult, type ConnectOrder, type PeerDiagnostics } from "./constants.js";
 
 export type StepResult = "PASS" | "FAILED" | "SKIPPED";
 
@@ -33,6 +33,7 @@ export interface AutomationReport {
   acousticLatencyMeasured: false;
   authorizedCommit: string;
   result: AutomationResult;
+  limitationReason?: string | null;
   scenarios: ScenarioReport[];
   observationSeconds: number;
   notes: string[];
@@ -73,9 +74,33 @@ export function allRequiredScenariosPassed(scenarios: ScenarioReport[]): boolean
   return scenarios.every((scenario) => scenario.result === "PASS" && scenarioMayPass(scenario));
 }
 
+export function classifyRtpHarnessLimitation(
+  peerA: { rtpPreflight?: PeerDiagnostics["rtpPreflight"]; connection: string | null; dataChannel: string | null },
+  peerB: { rtpPreflight?: PeerDiagnostics["rtpPreflight"]; connection: string | null; dataChannel: string | null },
+): string | null {
+  const peers = [peerA, peerB];
+  const allExhausted = peers.every((peer) => peer.rtpPreflight?.state === "exhausted");
+  const allConnected = peers.every(
+    (peer) => peer.connection === "connected" && peer.dataChannel === "open",
+  );
+  const boundedWindowCompleted = peers.every(
+    (peer) =>
+      (peer.rtpPreflight?.attempts ?? 0) >= 1 &&
+      (peer.rtpPreflight?.elapsed_ms ?? 0) >= 25_000,
+  );
+  const noRtpSeen = peers.every(
+    (peer) => !peer.rtpPreflight?.inbound_audio_seen && !peer.rtpPreflight?.outbound_audio_seen,
+  );
+  if (allExhausted && allConnected && boundedWindowCompleted && noRtpSeen) {
+    return "rtp_audio_stats_unavailable_under_fake_capture";
+  }
+  return null;
+}
+
 export function buildAutomationReport(input: {
   authorizedCommit: string;
   result: AutomationResult;
+  limitationReason?: string | null;
   scenarios: ScenarioReport[];
   observationSeconds: number;
   notes?: string[];
@@ -97,6 +122,7 @@ export function buildAutomationReport(input: {
     acousticLatencyMeasured: false,
     authorizedCommit: input.authorizedCommit,
     result: derivedResult,
+    limitationReason: input.limitationReason ?? null,
     scenarios: input.scenarios,
     observationSeconds: input.observationSeconds,
     notes: input.notes ?? [

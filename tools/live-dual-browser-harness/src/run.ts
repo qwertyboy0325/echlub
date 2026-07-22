@@ -30,6 +30,7 @@ import { ProcessManager } from "./process-manager.js";
 import {
   allRequiredScenariosPassed,
   buildAutomationReport,
+  classifyRtpHarnessLimitation,
   createScenarioReport,
   scenarioMayPass,
   type ScenarioReport,
@@ -79,6 +80,10 @@ async function writeScenarioDiagnostics(
     connectOrder: layout.order,
     peerA,
     peerB,
+    rtp_preflight: {
+      peerA: peerA.rtpPreflight ?? null,
+      peerB: peerB.rtpPreflight ?? null,
+    },
   });
   writeJson(join(layout.diagnosticsDir, "process-log-reference.json"), {
     processLog: runProcessLog,
@@ -227,6 +232,13 @@ async function runScenario(options: {
     }
 
     await writeScenarioDiagnostics(layout, options.runProcessLog, peerADiagnostics, peerBDiagnostics);
+    if (!report.readyReached && report.result === "FAILED") {
+      const limitationReason = classifyRtpHarnessLimitation(peerADiagnostics, peerBDiagnostics);
+      if (limitationReason) {
+        report.result = "HARNESS_LIMITATION";
+        report.error = limitationReason;
+      }
+    }
     if (diagnosticCaptureFailed && report.result === "PASS") {
       report.result = "FAILED";
       report.error = report.error ?? "diagnostic capture failed";
@@ -248,7 +260,8 @@ async function main(): Promise<number> {
   const processes = new ProcessManager(layout.processLog);
   const fakeAudio = ensureFakeAudioFixtures();
   const scenarios: ScenarioReport[] = [];
-  let finalResult: "PASS" | "FAILED" = "PASS";
+  let finalResult: import("./constants.js").AutomationResult = "PASS";
+  let limitationReason: string | null = null;
   let failureMessage: string | null = null;
   let cleanupFailed = false;
   let authorizedCommit = "unknown";
@@ -270,9 +283,16 @@ async function main(): Promise<number> {
       if (scenario.result !== "PASS" && failureMessage === null) {
         failureMessage = scenario.error;
       }
+      if (scenario.result === "HARNESS_LIMITATION" && limitationReason === null) {
+        limitationReason = scenario.error;
+      }
     }
 
-    if (!allRequiredScenariosPassed(scenarios)) {
+    if (allRequiredScenariosPassed(scenarios)) {
+      finalResult = "PASS";
+    } else if (scenarios.length > 0 && scenarios.every((scenario) => scenario.result === "HARNESS_LIMITATION")) {
+      finalResult = "HARNESS_LIMITATION";
+    } else {
       finalResult = "FAILED";
     }
   } catch (error) {
@@ -296,6 +316,7 @@ async function main(): Promise<number> {
   const report = buildAutomationReport({
     authorizedCommit,
     result: finalResult,
+    limitationReason,
     scenarios,
     observationSeconds: OBSERVATION_SECONDS,
     notes: failureMessage ? [`failure: ${failureMessage}`] : undefined,

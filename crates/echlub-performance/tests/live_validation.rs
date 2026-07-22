@@ -4,7 +4,7 @@ use echlub_performance::{
     verify_live_artifact_manifest, LiveValidationError, LIVE_SCHEMA_VERSION,
 };
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn vector_path(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -15,6 +15,46 @@ fn vector_path(name: &str) -> PathBuf {
 
 fn read_vector(name: &str) -> String {
     fs::read_to_string(vector_path(name)).unwrap()
+}
+
+fn copy_directory_fixture(name: &str, temp_name: &str) -> PathBuf {
+    let src = vector_path(name);
+    let temp = std::env::temp_dir().join(temp_name);
+    let _ = fs::remove_dir_all(&temp);
+    fs::create_dir_all(&temp).unwrap();
+    for entry in fs::read_dir(&src).unwrap() {
+        let entry = entry.unwrap();
+        fs::copy(entry.path(), temp.join(entry.file_name())).unwrap();
+    }
+    temp
+}
+
+fn rehash_manifest_file(temp: &Path, filename: &str, bytes: &[u8]) {
+    use echlub_performance::checksum_bytes;
+    let manifest_path = temp.join("artifact-manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+    for entry in manifest["artifacts"].as_array_mut().unwrap() {
+        if entry["filename"] == filename {
+            entry["checksum"] = serde_json::json!(checksum_bytes(bytes));
+        }
+    }
+    fs::write(
+        manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+}
+
+fn assert_directory_semantic_failure(temp: &Path, needle: &str) {
+    let result = validate_live_directory(temp);
+    assert!(!result.valid, "expected semantic failure for {needle}");
+    assert!(result.errors.iter().any(|e| {
+        matches!(
+            e,
+            LiveValidationError::ManifestVerification(msg) if msg.contains(needle)
+        )
+    }));
 }
 
 #[test]
@@ -311,17 +351,10 @@ fn rejects_transport_only_packet_progression_fixture() {
 
 #[test]
 fn live_directory_semantic_summary_mismatch_fails_after_checksum_regeneration() {
-    use echlub_performance::checksum_bytes;
-
-    let src = vector_path("live-directory-v1");
-    let temp = std::env::temp_dir().join("echlub-live-directory-semantic-mismatch");
-    let _ = fs::remove_dir_all(&temp);
-    fs::create_dir_all(&temp).unwrap();
-    for entry in fs::read_dir(&src).unwrap() {
-        let entry = entry.unwrap();
-        fs::copy(entry.path(), temp.join(entry.file_name())).unwrap();
-    }
-
+    let temp = copy_directory_fixture(
+        "live-directory-v1",
+        "echlub-live-directory-semantic-mismatch",
+    );
     let summary_path = temp.join("peer-a.summary.json");
     let mut summary: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&summary_path).unwrap()).unwrap();
@@ -330,28 +363,122 @@ fn live_directory_semantic_summary_mismatch_fails_after_checksum_regeneration() 
     }
     let summary_bytes = serde_json::to_vec_pretty(&summary).unwrap();
     fs::write(&summary_path, &summary_bytes).unwrap();
+    rehash_manifest_file(&temp, "peer-a.summary.json", &summary_bytes);
+    assert_directory_semantic_failure(&temp, "peer-a.summary.json");
+    let _ = fs::remove_dir_all(&temp);
+}
 
+#[test]
+fn live_directory_semantic_peer_b_summary_mismatch_fails() {
+    let temp = copy_directory_fixture("live-directory-v1", "echlub-live-directory-peer-b-summary");
+    let path = temp.join("peer-b.summary.json");
+    let mut summary: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    summary["medianClockProbeRttMs"] = serde_json::json!(9999);
+    let bytes = serde_json::to_vec_pretty(&summary).unwrap();
+    fs::write(&path, &bytes).unwrap();
+    rehash_manifest_file(&temp, "peer-b.summary.json", &bytes);
+    assert_directory_semantic_failure(&temp, "peer-b.summary.json");
+    let _ = fs::remove_dir_all(&temp);
+}
+
+#[test]
+fn live_directory_semantic_pair_summary_correlation_mismatch_fails() {
+    let temp = copy_directory_fixture("live-directory-v1", "echlub-live-directory-pair-corr");
+    let path = temp.join("pair-summary.json");
+    let mut pair: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    pair["sessionCorrelationId"] = serde_json::json!("0123456789abcdef0123456789abcde0");
+    let bytes = serde_json::to_vec_pretty(&pair).unwrap();
+    fs::write(&path, &bytes).unwrap();
+    rehash_manifest_file(&temp, "pair-summary.json", &bytes);
+    assert_directory_semantic_failure(&temp, "pair-summary.json");
+    let _ = fs::remove_dir_all(&temp);
+}
+
+#[test]
+fn live_directory_semantic_pair_summary_run_ids_mismatch_fails() {
+    let temp = copy_directory_fixture("live-directory-v1", "echlub-live-directory-pair-run-ids");
+    let path = temp.join("pair-summary.json");
+    let mut pair: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    pair["endpointRunIds"] = serde_json::json!(["stale-a", "stale-b"]);
+    let bytes = serde_json::to_vec_pretty(&pair).unwrap();
+    fs::write(&path, &bytes).unwrap();
+    rehash_manifest_file(&temp, "pair-summary.json", &bytes);
+    assert_directory_semantic_failure(&temp, "pair-summary.json");
+    let _ = fs::remove_dir_all(&temp);
+}
+
+#[test]
+fn live_directory_semantic_stale_report_fails_after_checksum_regeneration() {
+    let temp = copy_directory_fixture("live-directory-v1", "echlub-live-directory-stale-report");
+    let path = temp.join("report.md");
+    let mut report = fs::read_to_string(&path).unwrap();
+    report.push_str("\nstale appendix\n");
+    fs::write(&path, &report).unwrap();
+    rehash_manifest_file(&temp, "report.md", report.as_bytes());
+    assert_directory_semantic_failure(&temp, "report.md");
+    let _ = fs::remove_dir_all(&temp);
+}
+
+#[test]
+fn live_directory_semantic_manifest_pair_id_mismatch_fails() {
+    let temp = copy_directory_fixture(
+        "live-directory-v1",
+        "echlub-live-directory-manifest-pair-id",
+    );
     let manifest_path = temp.join("artifact-manifest.json");
     let mut manifest: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
-    for entry in manifest["artifacts"].as_array_mut().unwrap() {
-        if entry["filename"] == "peer-a.summary.json" {
-            entry["checksum"] = serde_json::json!(checksum_bytes(&summary_bytes));
-        }
-    }
+    manifest["pairId"] = serde_json::json!("pair-deadbeefdeadbeef");
     fs::write(
         manifest_path,
         serde_json::to_string_pretty(&manifest).unwrap(),
     )
     .unwrap();
-
-    let result = validate_live_directory(&temp);
+    assert_directory_semantic_failure(&temp, "pairId");
     let _ = fs::remove_dir_all(&temp);
-    assert!(!result.valid);
-    assert!(result.errors.iter().any(|e| matches!(
-        e,
-        LiveValidationError::ManifestVerification(msg) if msg.contains("peer-a.summary.json")
-    )));
+}
+
+#[test]
+fn live_directory_semantic_manifest_commit_mismatch_fails() {
+    let temp = copy_directory_fixture("live-directory-v1", "echlub-live-directory-manifest-commit");
+    let manifest_path = temp.join("artifact-manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+    manifest["softwareCommit"] = serde_json::json!("0000000000000000000000000000000000000000");
+    fs::write(
+        manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    assert_directory_semantic_failure(&temp, "softwareCommit");
+    let _ = fs::remove_dir_all(&temp);
+}
+
+#[test]
+fn playout_remote_audio_track_unmuted_round_trips_through_rust_schema() {
+    use echlub_performance::live_schema::LivePlayoutV1;
+    let playout_json = serde_json::json!({
+      "remoteAudioTrackReceived": true,
+      "remoteAudioTrackReadyState": "live",
+      "remoteAudioTrackUnmuted": true,
+      "autoplayAttempted": true
+    });
+    let playout: LivePlayoutV1 = serde_json::from_value(playout_json.clone()).unwrap();
+    assert_eq!(playout.remote_audio_track_unmuted, Some(true));
+    assert_eq!(
+        playout_json["remoteAudioTrackUnmuted"],
+        serde_json::json!(true)
+    );
+    assert!(playout_json.get("remoteAudioTrackMuted").is_none());
+    let reserialized = serde_json::to_value(&playout).unwrap();
+    assert_eq!(
+        reserialized["remoteAudioTrackUnmuted"],
+        serde_json::json!(true)
+    );
+    assert!(reserialized.get("remoteAudioTrackMuted").is_none());
 }
 
 #[test]

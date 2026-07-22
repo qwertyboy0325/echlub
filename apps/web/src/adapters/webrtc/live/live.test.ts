@@ -18,6 +18,11 @@ import {
   hasRtpAudioCounterAvailability,
   StatsSampler,
 } from "./stats-sampler";
+import {
+  DEFAULT_RTP_PREFLIGHT_CONFIG,
+  RtpStatsPreflightController,
+  sanitizeStatsReportShapes,
+} from "./stats-preflight";
 import { LiveWebRtcSession } from "./session";
 import {
   applySignalingDescription,
@@ -715,6 +720,24 @@ describe("session ready gate and export", () => {
     return { session, callbacks };
   }
 
+  function mockPreflight(state: "idle" | "probing" | "available" | "exhausted" | "cancelled") {
+    return {
+      getState: (): "idle" | "probing" | "available" | "exhausted" | "cancelled" => state,
+      maybeStart: vi.fn(),
+      cancel: vi.fn(),
+      reset: vi.fn(),
+      getDiagnostics: () => ({
+        state,
+        attempts: state === "available" ? 1 : state === "exhausted" ? 60 : 0,
+        inbound_audio_seen: state === "available",
+        outbound_audio_seen: state === "available",
+        elapsed_ms: state === "exhausted" ? 30_000 : 0,
+        failure_reason: state === "exhausted" ? "bounded RTP preflight window exhausted" : null,
+        sanitized_report_shapes: [],
+      }),
+    };
+  }
+
   function primeReadyInternals(
     session: LiveWebRtcSession,
     overrides: Record<string, unknown> = {},
@@ -725,8 +748,7 @@ describe("session ready gate and export", () => {
       dc: RTCDataChannel;
       remoteStream: MediaStream;
       clockSamples: ClockProbeSample[];
-      statsPreflightComplete: boolean;
-      statsPreflightHasRtpAudio: boolean;
+      statsPreflight: ReturnType<typeof mockPreflight> | null;
       negotiation: { makingOffer: boolean; isSettingRemoteAnswerPending: boolean };
       collectReadyFailures: () => string[];
       evaluateReadyToObserve: () => void;
@@ -744,8 +766,7 @@ describe("session ready gate and export", () => {
       getAudioTracks: () => [{ readyState: "live" }],
     } as MediaStream;
     internal.clockSamples = [probeSample({ requesterRole: "peer_a", responderRole: "peer_b" })];
-    internal.statsPreflightComplete = true;
-    internal.statsPreflightHasRtpAudio = true;
+    internal.statsPreflight = mockPreflight("available");
     internal.negotiation = { makingOffer: false, isSettingRemoteAnswerPending: false };
     Object.assign(internal, overrides);
     return internal;
@@ -755,7 +776,7 @@ describe("session ready gate and export", () => {
     const { session } = makeSession();
     const internal = primeReadyInternals(session, {
       clockSamples: [],
-      statsPreflightComplete: false,
+      statsPreflight: null,
     });
     internal.remoteStream = {
       getAudioTracks: () => [{ readyState: "live" }],
@@ -772,7 +793,7 @@ describe("session ready gate and export", () => {
 
   it("valid probe without stats preflight is not ready", () => {
     const { session } = makeSession();
-    const internal = primeReadyInternals(session, { statsPreflightComplete: false });
+    const internal = primeReadyInternals(session, { statsPreflight: null });
     expect(internal.collectReadyFailures()).toContain("stats preflight incomplete");
   });
 
@@ -813,8 +834,7 @@ describe("session ready gate and export", () => {
       dc: RTCDataChannel;
       remoteStream: MediaStream;
       clockSamples: ClockProbeSample[];
-      statsPreflightComplete: boolean;
-      statsPreflightHasRtpAudio: boolean;
+      statsPreflight: ReturnType<typeof mockPreflight> | null;
       collectReadyFailures: () => string[];
     };
     internal.localStream = {
@@ -830,8 +850,7 @@ describe("session ready gate and export", () => {
       getAudioTracks: () => [{ readyState: "live" }],
     } as MediaStream;
     internal.clockSamples = [probeSample({ requesterRole: "peer_a", responderRole: "peer_b" })];
-    internal.statsPreflightComplete = true;
-    internal.statsPreflightHasRtpAudio = true;
+    internal.statsPreflight = mockPreflight("available");
     expect(internal.collectReadyFailures()).toEqual([]);
   });
 
@@ -843,8 +862,7 @@ describe("session ready gate and export", () => {
       dc: RTCDataChannel;
       remoteStream: MediaStream;
       clockSamples: ClockProbeSample[];
-      statsPreflightComplete: boolean;
-      statsPreflightHasRtpAudio: boolean;
+      statsPreflight: ReturnType<typeof mockPreflight> | null;
       collectReadyFailures: () => string[];
     };
     internal.localStream = {
@@ -860,7 +878,7 @@ describe("session ready gate and export", () => {
       getAudioTracks: () => [{ readyState: "live" }],
     } as MediaStream;
     internal.clockSamples = [probeSample({ requesterRole: "peer_a", responderRole: "peer_b" })];
-    internal.statsPreflightComplete = false;
+    internal.statsPreflight = null;
     expect(internal.collectReadyFailures()).toContain("stats preflight incomplete");
   });
 
@@ -1092,11 +1110,167 @@ describe("peer discovery negotiation order", () => {
   });
 
   it("surfaces failed initial offer without leaving started state when unsafe", async () => {
-    const { onError, internal } = makeSession("peer_a");
+    const { onError, internal, session } = makeSession("peer_a");
     internal.pc!.createOffer = vi.fn().mockRejectedValue(new Error("offer failed"));
     internal.handlePeerJoined("peer_b");
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(onError).toHaveBeenCalled();
     expect(internal.peerNegotiationStarted).toBe(false);
+    expect(session.getPhase()).toBe("peer_present");
+  });
+});
+
+describe("bounded RTP stats preflight polling", () => {
+  function transportOnlyStats(): Map<string, Record<string, unknown>> {
+    return new Map([
+      [
+        "transport-1",
+        { id: "transport-1", type: "transport", selectedCandidatePairId: "pair-1" },
+      ],
+      [
+        "pair-1",
+        {
+          id: "pair-1",
+          type: "candidate-pair",
+          state: "succeeded",
+          localCandidateId: "local-1",
+          remoteCandidateId: "remote-1",
+          packetsSent: 10,
+          packetsReceived: 10,
+          bytesSent: 1000,
+          bytesReceived: 1000,
+        },
+      ],
+      ["local-1", { id: "local-1", type: "local-candidate", candidateType: "host" }],
+      ["remote-1", { id: "remote-1", type: "remote-candidate", candidateType: "host" }],
+    ]);
+  }
+
+  function rtpAudioStats(options: { inbound?: boolean; outbound?: boolean }): Map<string, Record<string, unknown>> {
+    const stats = transportOnlyStats();
+    if (options.inbound) {
+      stats.set("inbound-1", {
+        id: "inbound-1",
+        type: "inbound-rtp",
+        kind: "audio",
+        packetsReceived: 10,
+        bytesReceived: 1000,
+      });
+    }
+    if (options.outbound) {
+      stats.set("outbound-1", {
+        id: "outbound-1",
+        type: "outbound-rtp",
+        kind: "audio",
+        packetsSent: 8,
+        bytesSent: 800,
+      });
+    }
+    return stats;
+  }
+
+  function mockPc(statsSequence: Map<string, Record<string, unknown>>[]): RTCPeerConnection {
+    let call = 0;
+    return {
+      getStats: vi.fn(async () => {
+        const next = statsSequence[Math.min(call, statsSequence.length - 1)];
+        call += 1;
+        return next;
+      }),
+    } as unknown as RTCPeerConnection;
+  }
+
+  it("becomes available when second attempt exposes both RTP directions", async () => {
+    vi.useFakeTimers();
+    const controller = new RtpStatsPreflightController(
+      mockPc([transportOnlyStats(), rtpAudioStats({ inbound: true, outbound: true })]),
+      { intervalMs: 100, maximumDurationMs: 1000, maximumAttempts: 10 },
+      { now: () => 0 },
+    );
+    controller.maybeStart();
+    await vi.runAllTimersAsync();
+    expect(controller.getState()).toBe("available");
+    vi.useRealTimers();
+  });
+
+  it("accumulates inbound before outbound across attempts", async () => {
+    vi.useFakeTimers();
+    const controller = new RtpStatsPreflightController(
+      mockPc([
+        rtpAudioStats({ inbound: true }),
+        rtpAudioStats({ inbound: true }),
+        rtpAudioStats({ outbound: true }),
+      ]),
+      { intervalMs: 100, maximumDurationMs: 1000, maximumAttempts: 10 },
+      { now: () => 0 },
+    );
+    controller.maybeStart();
+    await vi.runAllTimersAsync();
+    const diagnostics = controller.getDiagnostics();
+    expect(diagnostics.inbound_audio_seen).toBe(true);
+    expect(diagnostics.outbound_audio_seen).toBe(true);
+    expect(controller.getState()).toBe("available");
+    vi.useRealTimers();
+  });
+
+  it("exhausts after transport-only attempts without satisfying Ready", async () => {
+    vi.useFakeTimers();
+    const controller = new RtpStatsPreflightController(
+      mockPc(Array.from({ length: 5 }, () => transportOnlyStats())),
+      { intervalMs: 100, maximumDurationMs: 400, maximumAttempts: 5 },
+      { now: () => 0 },
+    );
+    controller.maybeStart();
+    await vi.runAllTimersAsync();
+    expect(controller.getState()).toBe("exhausted");
+    expect(controller.getDiagnostics().inbound_audio_seen).toBe(false);
+    expect(controller.getDiagnostics().outbound_audio_seen).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("ignores stale async completion after cancel", async () => {
+    let resolveStats: ((value: Map<string, Record<string, unknown>>) => void) | undefined =
+      undefined;
+    let resolver: ((value: Map<string, Record<string, unknown>>) => void) | undefined;
+    const pc = {
+      getStats: vi.fn(
+        () =>
+          new Promise<Map<string, Record<string, unknown>>>((resolve) => {
+            resolver = resolve;
+          }),
+      ),
+    } as unknown as RTCPeerConnection;
+    const controller = new RtpStatsPreflightController(pc, {
+      intervalMs: 100,
+      maximumDurationMs: 1000,
+      maximumAttempts: 3,
+    });
+    controller.maybeStart();
+    controller.cancel("session stopped");
+    resolver?.(rtpAudioStats({ inbound: true, outbound: true }));
+    await Promise.resolve();
+    expect(controller.getState()).toBe("cancelled");
+  });
+
+  it("sanitizes report shapes without sensitive fields", () => {
+    const stats = rtpAudioStats({ inbound: true, outbound: true }) as unknown as RTCStatsReport;
+    const shapes = sanitizeStatsReportShapes(stats);
+    expect(shapes.length).toBeGreaterThan(0);
+    expect(JSON.stringify(shapes)).not.toMatch(/ssrc|address|sdp|deviceId/i);
+  });
+
+  it("tracks attempts without emitting observation samples", async () => {
+    vi.useFakeTimers();
+    const getStats = vi.fn(async () => transportOnlyStats());
+    const controller = new RtpStatsPreflightController(
+      { getStats } as unknown as RTCPeerConnection,
+      { intervalMs: 100, maximumDurationMs: 300, maximumAttempts: 3 },
+      { now: () => 0 },
+    );
+    controller.maybeStart();
+    await vi.runAllTimersAsync();
+    expect(getStats).toHaveBeenCalled();
+    expect(controller.getDiagnostics().attempts).toBeGreaterThan(0);
+    vi.useRealTimers();
   });
 });

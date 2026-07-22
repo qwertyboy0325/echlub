@@ -79,7 +79,18 @@ export async function connectPeer(page: Page): Promise<void> {
 
 export async function waitForReady(page: Page, timeoutMs = READY_TIMEOUT_MS): Promise<void> {
   const panel = page.locator("section.performance-panel");
-  await panel.getByText(/Phase: Ready To Observe/i).waitFor({ timeout: timeoutMs });
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const diagnostics = await readDiagnostics(page);
+    if (diagnostics.phase?.includes("Ready To Observe")) {
+      return;
+    }
+    if (diagnostics.rtpPreflight?.state === "exhausted") {
+      throw new Error("rtp_audio_stats_unavailable_under_fake_capture");
+    }
+    await sleep(500);
+  }
+  await panel.getByText(/Phase: Ready To Observe/i).waitFor({ timeout: 1_000 });
 }
 
 export async function startObservation(page: Page): Promise<void> {
@@ -109,6 +120,14 @@ export async function readDiagnostics(page: Page): Promise<PeerDiagnostics> {
   const samples = bodyText.match(/Samples: (\d+)/)?.[1] ?? null;
   const probes = bodyText.match(/Probes: (\d+)/)?.[1] ?? null;
   const error = (await page.locator(".error").allTextContents()).join("; ") || null;
+  const rtpPreflight = await page.evaluate(() => {
+    const reader = (
+      window as unknown as {
+        __echlubLiveRtpPreflightDiagnostics?: () => Record<string, unknown> | null;
+      }
+    ).__echlubLiveRtpPreflightDiagnostics;
+    return reader?.() ?? null;
+  });
   return {
     phase,
     connection,
@@ -119,6 +138,7 @@ export async function readDiagnostics(page: Page): Promise<PeerDiagnostics> {
     error,
     console: [],
     pageErrors: [],
+    rtpPreflight: rtpPreflight as PeerDiagnostics["rtpPreflight"],
   };
 }
 

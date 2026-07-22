@@ -31,6 +31,15 @@ export interface PeerDiagnostics {
   error: string | null;
   console: string[];
   pageErrors: string[];
+  rtpPreflight?: {
+    state: string;
+    attempts: number;
+    inbound_audio_seen: boolean;
+    outbound_audio_seen: boolean;
+    elapsed_ms: number;
+    failure_reason: string | null;
+    sanitized_report_shapes: unknown[];
+  } | null;
 }
 
 export function generateAutomationRunId(now = new Date()): string {

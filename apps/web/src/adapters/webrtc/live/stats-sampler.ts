@@ -141,8 +141,9 @@ export async function collectNormalizedStats(
   pc: RTCPeerConnection,
   offsetMs: number,
   prev: NormalizedStatsSample | null,
+  prefetchedStats?: RTCStatsReport,
 ): Promise<NormalizedStatsSample> {
-  const stats = await pc.getStats();
+  const stats = prefetchedStats ?? (await pc.getStats());
   let candidatePair: Record<string, MetricValue> = {};
   let inboundAudio: Record<string, MetricValue> = {};
   let outboundAudio: Record<string, MetricValue> = {};

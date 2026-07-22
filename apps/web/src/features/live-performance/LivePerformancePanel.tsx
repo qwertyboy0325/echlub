@@ -75,6 +75,22 @@ export function LivePerformancePanel() {
     if (observeTimer.current) clearInterval(observeTimer.current);
   }, []);
 
+  useEffect(() => {
+    (
+      window as unknown as {
+        __echlubLiveRtpPreflightDiagnostics?: () => ReturnType<
+          LiveWebRtcSession["getRtpPreflightDiagnostics"]
+        >;
+      }
+    ).__echlubLiveRtpPreflightDiagnostics = () =>
+      sessionRef.current?.getRtpPreflightDiagnostics() ?? null;
+    return () => {
+      delete (
+        window as unknown as { __echlubLiveRtpPreflightDiagnostics?: () => unknown }
+      ).__echlubLiveRtpPreflightDiagnostics;
+    };
+  }, []);
+
   const callbacks = useMemo(
     () => ({
       onPhaseChange: setPhase,
