@@ -76,8 +76,8 @@ remaining_risk: headed E2E must still prove both peers complete the bounded wind
 ## C12-004 — PR and documentation integrity
 
 ```yaml
-status: pending_final_headed_rerun
+status: fixed
 notes:
-  - PR #1 report checksum literal replaced after final commit E2E
-  - canonical HARNESS_LIMITATION wording applied only when classifier conditions are met at final rerun
+  - PR #1 report checksum literal replaced with 118d1da113f16da79c875d3865b07379fa41eafb2a350ca50b101783ef02ecba
+  - final-head automation @ 80307dc classified HARNESS_LIMITATION with bilateral fake-capture RTP gap
 ```
