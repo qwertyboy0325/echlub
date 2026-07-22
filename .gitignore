@@ -37,3 +37,4 @@ coverage/
 # Owner live observation imports (never commit)
 .local/live-observation-import/
 .local/live-automation/
+tools/live-dual-browser-harness/fixtures/*.wav
