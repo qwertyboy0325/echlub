@@ -68,6 +68,32 @@ export function validateCrossDeviceClockTimestamps(
   };
 }
 
+export function canonicalizeClockProbeSampleForExport(sample: ClockProbeSample): ClockProbeSample {
+  const roundTripped = JSON.parse(JSON.stringify(sample)) as ClockProbeSample;
+  if (
+    roundTripped.t0 === null ||
+    roundTripped.t1 === null ||
+    roundTripped.t2 === null ||
+    roundTripped.t3 === null
+  ) {
+    return roundTripped;
+  }
+  const validation = validateCrossDeviceClockTimestamps(
+    roundTripped.t0,
+    roundTripped.t1,
+    roundTripped.t2,
+    roundTripped.t3,
+  );
+  if (!validation.valid || validation.rttMs === null) {
+    return roundTripped;
+  }
+  return {
+    ...roundTripped,
+    rttMs: validation.rttMs,
+    offsetMs: validation.offsetMs,
+  };
+}
+
 export function verifyStoredClockMetrics(
   sample: Pick<ClockProbeSample, "t0" | "t1" | "t2" | "t3" | "rttMs" | "offsetMs">,
 ): boolean {

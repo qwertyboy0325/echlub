@@ -1,4 +1,5 @@
 import {
+  canonicalizeClockProbeSampleForExport,
   ClockProbeEngine,
   computeClockMedian,
   validLocalCompletedProbes,
@@ -256,7 +257,7 @@ export class LiveWebRtcSession {
         ...this.dataChannelProps,
       },
       clockProbes: {
-        samples: this.clockSamples,
+        samples: this.clockSamples.map(canonicalizeClockProbeSampleForExport),
         completedProbes: validLocalCompletedProbes(this.clockSamples, this.config.localPeerId).length,
         medianRttMs: medians.rtt,
         medianOffsetMs: medians.offset,

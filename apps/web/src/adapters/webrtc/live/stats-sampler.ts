@@ -168,6 +168,32 @@ export async function collectNormalizedStats(
     sample.intervalMetrics = computeIntervalMetrics(prev, sample);
   }
 
+  if (!("packetsReceived" in inboundAudio) && candidatePair.packetsReceived) {
+    inboundAudio = {
+      packetsReceived: candidatePair.packetsReceived,
+      bytesReceived: candidatePair.bytesReceived ?? unsupported(),
+      packetsLost: unsupported(),
+      jitter: unsupported(),
+      jitterBufferDelay: unsupported(),
+      jitterBufferTargetDelay: unsupported(),
+      jitterBufferMinimumDelay: unsupported(),
+      concealedSamples: unsupported(),
+      totalSamplesReceived: unsupported(),
+      audioLevel: unsupported(),
+    };
+  }
+  if (!("packetsSent" in outboundAudio) && candidatePair.packetsSent) {
+    outboundAudio = {
+      packetsSent: candidatePair.packetsSent,
+      bytesSent: candidatePair.bytesSent ?? unsupported(),
+      retransmittedPacketsSent: unsupported(),
+      audioLevel: unsupported(),
+    };
+  }
+
+  sample.inboundAudio = inboundAudio;
+  sample.outboundAudio = outboundAudio;
+
   return sample;
 }
 
