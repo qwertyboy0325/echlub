@@ -3,6 +3,7 @@ import { DEFAULT_SIGNALING_URL } from "../../adapters/signaling/client";
 import { LiveWebRtcSession } from "../../adapters/webrtc/live/session";
 import {
   generateSessionCorrelationId,
+  normalizeSessionCorrelationId,
   type CaptureProfile,
   type LiveSessionPhase,
   type PeerRole,
@@ -47,10 +48,22 @@ export function LivePerformancePanel() {
   const [headphonesAck, setHeadphonesAck] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sessionRef = useRef<LiveWebRtcSession | null>(null);
+  const activeSessionConfigRef = useRef<{
+    sessionCorrelationId: string;
+    localPeerId: PeerRole;
+    signalingUrl: string;
+    captureProfile: CaptureProfile;
+  } | null>(null);
   const probeValues = useRef<number[]>([]);
   const observeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const canPrepare = phase === "idle";
+  const configEditable = phase === "idle";
+  const normalizedCorrelationId = normalizeSessionCorrelationId(correlationId);
+  const correlationValidationError =
+    configEditable && correlationId.trim() !== "" && normalizedCorrelationId === null
+      ? "Session correlation ID must be exactly 32 hexadecimal characters."
+      : null;
+  const canPrepare = configEditable && normalizedCorrelationId !== null;
   const canEnableMic = headphonesAck && (phase === "prepared" || phase === "idle");
   const canConnect = phase === "microphone_ready";
   const canObserve = phase === "ready_to_observe";
@@ -91,18 +104,30 @@ export function LivePerformancePanel() {
 
   const prepare = useCallback(() => {
     setError(null);
-    const session = new LiveWebRtcSession(
-      {
-        sessionCorrelationId: correlationId,
-        localPeerId: role,
-        signalingUrl,
-        captureProfile,
-        softwareCommit: injectedSoftwareCommit(),
-      },
-      callbacks,
-    );
+    const validatedCorrelationId = normalizeSessionCorrelationId(correlationId);
+    if (!validatedCorrelationId) {
+      setError("Session correlation ID must be exactly 32 hexadecimal characters.");
+      return;
+    }
+    if (correlationId !== validatedCorrelationId) {
+      setCorrelationId(validatedCorrelationId);
+    }
+    const sessionConfig = {
+      sessionCorrelationId: validatedCorrelationId,
+      localPeerId: role,
+      signalingUrl,
+      captureProfile,
+      softwareCommit: injectedSoftwareCommit(),
+    };
+    const session = new LiveWebRtcSession(sessionConfig, callbacks);
     session.prepare();
     sessionRef.current = session;
+    activeSessionConfigRef.current = {
+      sessionCorrelationId: validatedCorrelationId,
+      localPeerId: role,
+      signalingUrl,
+      captureProfile,
+    };
   }, [callbacks, captureProfile, correlationId, role, signalingUrl]);
 
   const enableMic = useCallback(async () => {
@@ -136,7 +161,10 @@ export function LivePerformancePanel() {
       if (endpoint.exportKind !== "finalized") {
         throw new Error("finalized export produced non-finalized artifact");
       }
-      downloadJson(`${role}-${correlationId.slice(0, 8)}-finalized.json`, endpoint);
+      const active = activeSessionConfigRef.current;
+      const exportRole = active?.localPeerId ?? role;
+      const exportCorrelationId = active?.sessionCorrelationId ?? correlationId;
+      downloadJson(`${exportRole}-${exportCorrelationId.slice(0, 8)}-finalized.json`, endpoint);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -146,7 +174,10 @@ export function LivePerformancePanel() {
     try {
       const draft = sessionRef.current?.exportEndpointDraft();
       if (!draft) return;
-      downloadJson(`${role}-${correlationId.slice(0, 8)}-diagnostic_draft.json`, draft);
+      const active = activeSessionConfigRef.current;
+      const exportRole = active?.localPeerId ?? role;
+      const exportCorrelationId = active?.sessionCorrelationId ?? correlationId;
+      downloadJson(`${exportRole}-${exportCorrelationId.slice(0, 8)}-diagnostic_draft.json`, draft);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -160,6 +191,7 @@ export function LivePerformancePanel() {
 
   const reset = useCallback(() => {
     disconnect();
+    activeSessionConfigRef.current = null;
     setCorrelationId(generateSessionCorrelationId());
     setPhase("idle");
     setSampleCount(0);
@@ -178,28 +210,65 @@ export function LivePerformancePanel() {
       <div className="controls">
         <label>
           Session correlation ID
-          <input value={correlationId} readOnly />
-          <button type="button" onClick={() => setCorrelationId(generateSessionCorrelationId())}>
+          <input
+            value={correlationId}
+            readOnly={!configEditable}
+            onChange={(e) => {
+              if (configEditable) {
+                setCorrelationId(e.target.value);
+              }
+            }}
+            aria-invalid={correlationValidationError ? true : undefined}
+          />
+          <button
+            type="button"
+            disabled={!configEditable}
+            onClick={() => setCorrelationId(generateSessionCorrelationId())}
+          >
             Generate
           </button>
-          <button type="button" onClick={() => navigator.clipboard.writeText(correlationId)}>
+          <button
+            type="button"
+            disabled={normalizedCorrelationId === null}
+            onClick={() => {
+              if (normalizedCorrelationId) {
+                void navigator.clipboard.writeText(normalizedCorrelationId);
+              }
+            }}
+          >
             Copy
           </button>
         </label>
         <label>
           Signaling URL (not exported)
-          <input value={signalingUrl} onChange={(e) => setSignalingUrl(e.target.value)} />
+          <input
+            value={signalingUrl}
+            readOnly={!configEditable}
+            onChange={(e) => {
+              if (configEditable) {
+                setSignalingUrl(e.target.value);
+              }
+            }}
+          />
         </label>
         <label>
           Role
-          <select value={role} onChange={(e) => setRole(e.target.value as PeerRole)}>
+          <select
+            value={role}
+            disabled={!configEditable}
+            onChange={(e) => setRole(e.target.value as PeerRole)}
+          >
             <option value="peer_a">Peer A</option>
             <option value="peer_b">Peer B</option>
           </select>
         </label>
         <label>
           Capture profile
-          <select value={captureProfile} onChange={(e) => setCaptureProfile(e.target.value as CaptureProfile)}>
+          <select
+            value={captureProfile}
+            disabled={!configEditable}
+            onChange={(e) => setCaptureProfile(e.target.value as CaptureProfile)}
+          >
             <option value="browser_default">browser_default</option>
             <option value="music_low_latency">music_low_latency</option>
           </select>
@@ -229,6 +298,7 @@ export function LivePerformancePanel() {
       {clockRttMedian !== null && (
         <p>Clock-probe RTT median: {clockRttMedian.toFixed(2)} ms (estimate; not one-way latency)</p>
       )}
+      {correlationValidationError && <p className="error">{correlationValidationError}</p>}
       {error && <p className="error">{error}</p>}
       <audio id="remote-audio" autoPlay />
     </section>

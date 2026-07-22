@@ -908,3 +908,63 @@ describe("offer creation", () => {
     expect(state.makingOffer).toBe(false);
   });
 });
+
+describe("peer discovery negotiation order", () => {
+  function makeSession(role: PeerRole) {
+    const onNegotiation = vi.fn();
+    const callbacks = {
+      onPhaseChange: vi.fn(),
+      onSignalingState: vi.fn(),
+      onConnectionState: vi.fn(),
+      onIceState: vi.fn(),
+      onDataChannelState: vi.fn(),
+      onRemoteStream: vi.fn(),
+      onMicrophoneState: vi.fn(),
+      onNegotiation,
+      onClockProbe: vi.fn(),
+      onStatsSample: vi.fn(),
+      onError: vi.fn(),
+    };
+    const session = new LiveWebRtcSession(
+      {
+        sessionCorrelationId: "0123456789abcdef0123456789abcdef",
+        localPeerId: role,
+        softwareCommit: "e4198657264a6b4629948469dcdabde21a3eaa34",
+      },
+      callbacks,
+    );
+    const internal = session as unknown as {
+      handlePeerJoined: (peerId: string) => void;
+      peerNegotiationStarted: boolean;
+      pc: RTCPeerConnection | null;
+    };
+    internal.pc = {
+      createOffer: vi.fn().mockResolvedValue({ type: "offer", sdp: "v=0" }),
+      setLocalDescription: vi.fn().mockResolvedValue(undefined),
+      localDescription: { type: "offer", sdp: "v=0" },
+      signalingState: "stable",
+    } as unknown as RTCPeerConnection;
+    return { session, onNegotiation, internal, callbacks };
+  }
+
+  it("peer_a initiates exactly one negotiation when learning peer_b already exists", () => {
+    const { onNegotiation, internal } = makeSession("peer_a");
+    internal.handlePeerJoined("peer_b");
+    internal.handlePeerJoined("peer_b");
+    expect(onNegotiation).toHaveBeenCalledTimes(1);
+    expect(internal.peerNegotiationStarted).toBe(true);
+  });
+
+  it("peer_b never initiates an offer when peer_a joins", () => {
+    const { onNegotiation, internal } = makeSession("peer_b");
+    internal.handlePeerJoined("peer_a");
+    expect(onNegotiation).not.toHaveBeenCalled();
+    expect(internal.peerNegotiationStarted).toBe(false);
+  });
+
+  it("ignores self peer_joined notifications", () => {
+    const { onNegotiation, internal } = makeSession("peer_a");
+    internal.handlePeerJoined("peer_a");
+    expect(onNegotiation).not.toHaveBeenCalled();
+  });
+});

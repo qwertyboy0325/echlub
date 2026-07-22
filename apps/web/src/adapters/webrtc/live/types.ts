@@ -93,6 +93,20 @@ export function generateSessionCorrelationId(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+export const SESSION_CORRELATION_ID_PATTERN = /^[0-9a-fA-F]{32}$/;
+
+export function normalizeSessionCorrelationId(value: string): string | null {
+  const trimmed = value.trim();
+  if (!SESSION_CORRELATION_ID_PATTERN.test(trimmed)) {
+    return null;
+  }
+  return trimmed.toLowerCase();
+}
+
+export function isValidSessionCorrelationId(value: string): boolean {
+  return normalizeSessionCorrelationId(value) !== null;
+}
+
 export function observedNumber(value: number): MetricValue {
   return { kind: "observed_number", value };
 }

@@ -60,6 +60,7 @@ export class LiveWebRtcSession {
   private captureState: Record<string, unknown> = {};
   private statsPreflightComplete = false;
   private statsPreflightStarted = false;
+  private peerNegotiationStarted = false;
 
   private static readonly MIN_FINALIZED_STATS = 30;
   private static readonly MIN_FINALIZED_PROBES = 10;
@@ -132,15 +133,7 @@ export class LiveWebRtcSession {
       peerId: this.config.localPeerId,
       url: this.config.signalingUrl,
       onMessage: (payload) => void this.handleSignaling(payload),
-      onPeerJoined: (peerId) => {
-        if (peerId !== this.config.localPeerId) {
-          this.peerPresent = true;
-          this.setPhase("peer_present");
-          if (this.config.localPeerId === "peer_a") {
-            void this.startNegotiation();
-          }
-        }
-      },
+      onPeerJoined: (peerId) => this.handlePeerJoined(peerId),
       onPeerLeft: () => {
         this.peerPresent = false;
       },
@@ -428,6 +421,18 @@ export class LiveWebRtcSession {
 
   private relayDescription(type: RTCSdpType, sdp: RTCSessionDescriptionInit): void {
     this.signaling?.relay({ type: "description", descriptionType: type, sdp });
+  }
+
+  private handlePeerJoined(peerId: string): void {
+    if (!peerId || peerId === this.config.localPeerId) {
+      return;
+    }
+    this.peerPresent = true;
+    this.setPhase("peer_present");
+    if (this.config.localPeerId === "peer_a" && !this.peerNegotiationStarted) {
+      this.peerNegotiationStarted = true;
+      void this.startNegotiation();
+    }
   }
 
   private async startNegotiation(): Promise<void> {

@@ -38,7 +38,9 @@ export class SignalingClient {
         };
         switch (msg.type) {
           case "peer_joined":
-            this.options.onPeerJoined?.(msg.peer_id ?? "");
+            if (msg.peer_id && msg.peer_id !== this.options.peerId) {
+              this.options.onPeerJoined?.(msg.peer_id);
+            }
             break;
           case "peer_left":
             this.options.onPeerLeft?.(msg.peer_id ?? "");
