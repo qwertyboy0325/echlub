@@ -1,3 +1,7 @@
+use crate::live_clock::{
+    compute_cross_device_clock_metrics, is_valid_completed_local_probe, opposite_peer_role,
+    probe_requester_role, probe_responder_role, stored_clock_metrics_consistent, ClockMetricError,
+};
 use crate::live_derived::compute_live_endpoint_derived;
 use crate::live_privacy::{contains_live_forbidden_content, scan_live_value_for_forbidden_keys};
 use crate::live_schema::{
@@ -5,8 +9,8 @@ use crate::live_schema::{
     ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_A, ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_B,
     ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_A, ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_B,
     ARTIFACT_ROLE_PAIR_REPORT, ARTIFACT_ROLE_PAIR_SUMMARY, CHECKSUM_ALGORITHM,
-    CLOCK_PROBE_PROTOCOL_VERSION, LIVE_MANIFEST_SCHEMA_VERSION, LIVE_PAIR_REPORT_DISCLAIMER_PREFIX,
-    LIVE_PAIR_SCHEMA_VERSION, LIVE_SCHEMA_VERSION,
+    LIVE_MANIFEST_SCHEMA_VERSION, LIVE_PAIR_REPORT_DISCLAIMER_PREFIX, LIVE_PAIR_SCHEMA_VERSION,
+    LIVE_SCHEMA_VERSION,
 };
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -16,6 +20,8 @@ pub const MIN_STATS_SAMPLES: usize = 30;
 pub const MIN_CLOCK_PROBES: usize = 10;
 pub const MAX_STATS_SAMPLES: usize = 180;
 pub const MAX_DURATION_SECONDS: f64 = 180.0;
+pub use crate::live_clock::CrossDeviceClockMetrics;
+pub use crate::live_clock::CLOCK_METRIC_EPSILON_MS;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum LiveValidationError {
@@ -53,6 +59,10 @@ pub enum LiveValidationError {
     StatsOffsetsOutOfBounds,
     #[error("invalid clock probe sample")]
     InvalidClockProbe,
+    #[error("clock RTT mismatch")]
+    ClockRttMismatch,
+    #[error("clock offset mismatch")]
+    ClockOffsetMismatch,
     #[error("invalid responder role: {0}")]
     InvalidResponderRole(String),
     #[error("missing limitations")]
@@ -201,91 +211,15 @@ pub fn count_valid_local_probes(value: &Value) -> usize {
         .count()
 }
 
-fn opposite_peer_role(role: &str) -> Option<&'static str> {
-    match role {
-        "peer_a" => Some("peer_b"),
-        "peer_b" => Some("peer_a"),
-        _ => None,
-    }
-}
-
 pub fn validate_cross_device_clock_timestamps(t0: f64, t1: f64, t2: f64, t3: f64) -> Option<f64> {
-    if !t0.is_finite() || !t1.is_finite() || !t2.is_finite() || !t3.is_finite() {
-        return None;
-    }
-    if t3 < t0 || t2 < t1 {
-        return None;
-    }
-    let remote_processing_duration = t2 - t1;
-    let local_round_trip_duration = t3 - t0;
-    if remote_processing_duration < 0.0 || local_round_trip_duration < 0.0 {
-        return None;
-    }
-    let rtt = local_round_trip_duration - remote_processing_duration;
-    if !rtt.is_finite() || rtt < 0.0 {
-        return None;
-    }
-    Some(rtt)
+    compute_cross_device_clock_metrics(t0, t1, t2, t3).map(|metrics| metrics.rtt_ms)
 }
 
-fn probe_requester_role(sample: &Value) -> Option<&str> {
-    sample
-        .get("requesterRole")
-        .or_else(|| sample.get("requester_role"))
-        .or_else(|| sample.get("senderRole"))
-        .and_then(|v| v.as_str())
-}
-
-fn probe_responder_role(sample: &Value) -> Option<&str> {
-    sample
-        .get("responderRole")
-        .or_else(|| sample.get("responder_role"))
-        .and_then(|v| v.as_str())
-}
-
-fn is_valid_completed_local_probe(sample: &Value, peer_role: &str) -> bool {
-    if probe_requester_role(sample) != Some(peer_role) {
-        return false;
-    }
-    if sample.get("timeout").and_then(|v| v.as_bool()) != Some(false) {
-        return false;
-    }
-    if sample.get("duplicate").and_then(|v| v.as_bool()) != Some(false) {
-        return false;
-    }
-    if sample.get("unsolicited").and_then(|v| v.as_bool()) != Some(false) {
-        return false;
-    }
-    if sample.get("invalid").and_then(|v| v.as_bool()) != Some(false) {
-        return false;
-    }
-    let protocol = sample
-        .get("protocolVersion")
-        .or_else(|| sample.get("protocol_version"))
-        .and_then(|v| v.as_i64());
-    if protocol != Some(CLOCK_PROBE_PROTOCOL_VERSION) {
-        return false;
-    }
-    let expected_responder = match opposite_peer_role(peer_role) {
-        Some(role) => role,
-        None => return false,
-    };
-    if probe_responder_role(sample) != Some(expected_responder) {
-        return false;
-    }
-    let rtt = sample.get("rttMs").or_else(|| sample.get("rtt_ms"));
-    if !rtt.map(|v| v.is_number()).unwrap_or(false) {
-        return false;
-    }
-    let t0 = sample.get("t0").and_then(|v| v.as_f64());
-    let t1 = sample.get("t1").and_then(|v| v.as_f64());
-    let t2 = sample.get("t2").and_then(|v| v.as_f64());
-    let t3 = sample.get("t3").and_then(|v| v.as_f64());
-    match (t0, t1, t2, t3) {
-        (Some(t0), Some(t1), Some(t2), Some(t3)) => {
-            validate_cross_device_clock_timestamps(t0, t1, t2, t3).is_some()
-        }
-        _ => false,
+fn map_clock_metric_error(err: ClockMetricError) -> LiveValidationError {
+    match err {
+        ClockMetricError::InvalidProbe => LiveValidationError::InvalidClockProbe,
+        ClockMetricError::RttMismatch => LiveValidationError::ClockRttMismatch,
+        ClockMetricError::OffsetMismatch => LiveValidationError::ClockOffsetMismatch,
     }
 }
 
@@ -455,6 +389,12 @@ fn validate_clock_probe_samples(value: &Value, errors: &mut Vec<LiveValidationEr
         {
             errors.push(LiveValidationError::InvalidClockProbe);
             return;
+        }
+        if requester == Some(peer_role) && is_completed {
+            if let Err(err) = stored_clock_metrics_consistent(sample) {
+                errors.push(map_clock_metric_error(err));
+                return;
+            }
         }
     }
 }

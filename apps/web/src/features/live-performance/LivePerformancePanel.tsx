@@ -114,10 +114,19 @@ export function LivePerformancePanel() {
   }, []);
 
   const startObservation = useCallback(async () => {
+    setError(null);
     setElapsed(0);
     observeTimer.current = setInterval(() => setElapsed((e) => e + 1), 1000);
-    await sessionRef.current?.startObservation({ durationSeconds: 60, probeCount: 30 });
-    if (observeTimer.current) clearInterval(observeTimer.current);
+    try {
+      await sessionRef.current?.startObservation({ durationSeconds: 60, probeCount: 30 });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (observeTimer.current) {
+        clearInterval(observeTimer.current);
+        observeTimer.current = null;
+      }
+    }
   }, []);
 
   const exportFinalized = useCallback(() => {

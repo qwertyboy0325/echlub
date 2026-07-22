@@ -217,7 +217,7 @@ export function computeIntervalMetrics(
   );
   if (recvDelta.kind === "observed_number") {
     metrics.receiveBitrateBps = observedNumber((recvDelta.value * 8 * 1000) / dt);
-  } else if (recvDelta.kind === "invalid" && recvDelta.reason === "counter_reset") {
+  } else {
     metrics.receiveBitrateBps = recvDelta;
   }
   const sendDelta = deltaCumulativeMetric(
@@ -226,7 +226,7 @@ export function computeIntervalMetrics(
   );
   if (sendDelta.kind === "observed_number") {
     metrics.sendBitrateBps = observedNumber((sendDelta.value * 8 * 1000) / dt);
-  } else if (sendDelta.kind === "invalid" && sendDelta.reason === "counter_reset") {
+  } else {
     metrics.sendBitrateBps = sendDelta;
   }
   const lossDelta = deltaCumulativeMetric(
@@ -235,7 +235,7 @@ export function computeIntervalMetrics(
   );
   if (lossDelta.kind === "observed_number") {
     metrics.packetLossDelta = lossDelta;
-  } else if (lossDelta.kind === "invalid" && lossDelta.reason === "counter_reset") {
+  } else {
     metrics.packetLossDelta = lossDelta;
   }
   return metrics;

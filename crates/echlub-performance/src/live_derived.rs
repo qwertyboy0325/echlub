@@ -1,3 +1,4 @@
+use crate::live_clock::canonical_metrics_from_valid_local_probe;
 use crate::live_schema::LiveMetricValue;
 use serde_json::Value;
 
@@ -49,27 +50,18 @@ pub fn compute_live_endpoint_derived(endpoint: &Value) -> Value {
         .cloned()
         .unwrap_or_default();
 
+    let peer_role = endpoint
+        .get("peerRole")
+        .or_else(|| endpoint.get("peer_role"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
     let mut rtts = Vec::new();
     let mut offsets = Vec::new();
     for probe in &clock {
-        if probe.get("timeout").and_then(|v| v.as_bool()) == Some(true) {
-            continue;
-        }
-        if let Some(rtt) = probe
-            .get("rttMs")
-            .or(probe.get("rtt_ms"))
-            .and_then(|v| v.as_f64())
-        {
-            if rtt >= 0.0 {
-                rtts.push(rtt);
-            }
-        }
-        if let Some(offset) = probe
-            .get("offsetMs")
-            .or(probe.get("offset_ms"))
-            .and_then(|v| v.as_f64())
-        {
-            offsets.push(offset);
+        if let Some(metrics) = canonical_metrics_from_valid_local_probe(probe, peer_role) {
+            rtts.push(metrics.rtt_ms);
+            offsets.push(metrics.offset_ms);
         }
     }
 

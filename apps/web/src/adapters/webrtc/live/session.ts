@@ -441,13 +441,15 @@ export class LiveWebRtcSession {
 
   private evaluateReadyToObserve(): void {
     this.ensureStatsPreflight();
-    try {
-      this.collectReadyFailures();
-      if (this.phase !== "observing" && this.phase !== "completed" && this.phase !== "finalizing") {
-        this.setPhase("ready_to_observe");
-      }
-    } catch {
-      /* not ready yet */
+    const failures = this.collectReadyFailures();
+    if (
+      failures.length === 0 &&
+      this.phase !== "observing" &&
+      this.phase !== "completed" &&
+      this.phase !== "finalizing" &&
+      this.phase !== "ready_to_observe"
+    ) {
+      this.setPhase("ready_to_observe");
     }
   }
 

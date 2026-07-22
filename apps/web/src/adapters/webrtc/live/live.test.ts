@@ -6,6 +6,7 @@ import {
   MAX_PROBE_PAYLOAD_BYTES,
   oppositeRole,
   validateCrossDeviceClockTimestamps,
+  verifyStoredClockMetrics,
   validCompletedProbes,
   validLocalCompletedProbes,
 } from "./clock-probe";
@@ -41,6 +42,72 @@ function probeSample(overrides: Partial<ClockProbeSample> = {}): ClockProbeSampl
     ...overrides,
   };
 }
+
+describe("stored clock metric consistency", () => {
+  it.each([
+    ["+500ms offset", { t0: 1000, t1: 1510, t2: 1511, t3: 1021, rttMs: 20, offsetMs: 500 }],
+    ["-500ms offset", { t0: 1000, t1: 510, t2: 511, t3: 1021, rttMs: 20, offsetMs: -500 }],
+  ])("accepts valid %s", (_label, sample) => {
+    expect(verifyStoredClockMetrics(sample)).toBe(true);
+  });
+
+  it("rejects stored RTT differing from timestamps", () => {
+    expect(
+      verifyStoredClockMetrics({
+        t0: 1000,
+        t1: 1010,
+        t2: 1011,
+        t3: 1021,
+        rttMs: 999,
+        offsetMs: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects negative stored RTT", () => {
+    expect(
+      verifyStoredClockMetrics({
+        t0: 1000,
+        t1: 1010,
+        t2: 1011,
+        t3: 1021,
+        rttMs: -5,
+        offsetMs: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects stored offset differing from canonical offset", () => {
+    expect(
+      verifyStoredClockMetrics({
+        t0: 1000,
+        t1: 1510,
+        t2: 1511,
+        t3: 1021,
+        rttMs: 20,
+        offsetMs: 123,
+      }),
+    ).toBe(false);
+  });
+
+  it("excludes duplicate probe with arbitrary RTT from valid completed probes", () => {
+    const valid = probeSample({ rttMs: 20 });
+    const duplicate = probeSample({ sequence: 1, duplicate: true, rttMs: 9999 });
+    expect(validCompletedProbes([valid, duplicate])).toEqual([valid]);
+  });
+
+  it("excludes unsolicited probe with arbitrary RTT from valid completed probes", () => {
+    const valid = probeSample({ rttMs: 20 });
+    const unsolicited = probeSample({ sequence: 1, unsolicited: true, rttMs: 9999 });
+    expect(validCompletedProbes([valid, unsolicited])).toEqual([valid]);
+  });
+
+  it("excludes invalid probe with arbitrary RTT from valid completed probes", () => {
+    const valid = probeSample({ rttMs: 20 });
+    const invalidProbe = probeSample({ sequence: 1, invalid: true, rttMs: 9999 });
+    expect(validCompletedProbes([valid, invalidProbe])).toEqual([valid]);
+  });
+});
 
 describe("cross-device clock semantics", () => {
   it.each([
@@ -157,7 +224,44 @@ describe("stats interval metrics", () => {
   });
 
   it("returns unavailable for missing previous value", () => {
-    expect(deltaCumulativeMetric(unsupported(), observedNumber(1))).toEqual(unsupported());
+    expect(deltaCumulativeMetric(unavailable("missing"), observedNumber(1))).toEqual(
+      unavailable("missing previous value"),
+    );
+  });
+
+  it("returns unavailable for missing current value", () => {
+    expect(deltaCumulativeMetric(observedNumber(1), unavailable("missing"))).toEqual(
+      unavailable("missing current value"),
+    );
+  });
+
+  it("returns unsupported when source unsupported", () => {
+    expect(deltaCumulativeMetric(unsupported(), unsupported())).toEqual(unsupported());
+    const metrics = computeIntervalMetrics(
+      { ...baseSample(100, 0), inboundAudio: {}, outboundAudio: {} },
+      { ...baseSample(200, 1000), inboundAudio: {}, outboundAudio: {} },
+    );
+    expect(metrics.receiveBitrateBps).toEqual(unsupported());
+    expect(metrics.sendBitrateBps).toEqual(unsupported());
+    expect(metrics.packetLossDelta).toEqual(unsupported());
+  });
+
+  it("preserves counter reset interval state", () => {
+    const metrics = computeIntervalMetrics(
+      {
+        ...baseSample(100, 0),
+        inboundAudio: { bytesReceived: observedNumber(10), packetsLost: observedNumber(5) },
+        outboundAudio: { bytesSent: observedNumber(10) },
+      },
+      {
+        ...baseSample(200, 1000),
+        inboundAudio: { bytesReceived: observedNumber(3), packetsLost: observedNumber(1) },
+        outboundAudio: { bytesSent: observedNumber(3) },
+      },
+    );
+    expect(metrics.receiveBitrateBps).toEqual(invalid("counter_reset"));
+    expect(metrics.sendBitrateBps).toEqual(invalid("counter_reset"));
+    expect(metrics.packetLossDelta).toEqual(invalid("counter_reset"));
   });
 
   it("returns invalid for wrong metric type", () => {
@@ -229,10 +333,28 @@ describe("clock probe formulas", () => {
   });
 
   it("computes median RTT and MAD", () => {
-    const samples = [probeSample({ rttMs: 10 }), probeSample({ sequence: 1, rttMs: 20 })];
+    const samples = [
+      probeSample({
+        t0: 1000,
+        t1: 1005,
+        t2: 1006,
+        t3: 1011,
+        rttMs: 10,
+        offsetMs: 0,
+      }),
+      probeSample({
+        sequence: 1,
+        t0: 1100,
+        t1: 1105,
+        t2: 1106,
+        t3: 1131,
+        rttMs: 30,
+        offsetMs: -10,
+      }),
+    ];
     const medians = computeClockMedian(samples);
-    expect(medians.rtt).toBe(15);
-    expect(medians.madRtt).toBe(5);
+    expect(medians.rtt).toBe(20);
+    expect(medians.madRtt).toBe(10);
   });
 
   it("excludes timeout and invalid probes from median", () => {
@@ -526,6 +648,94 @@ describe("session ready gate and export", () => {
     );
     return { session, callbacks };
   }
+
+  function primeReadyInternals(
+    session: LiveWebRtcSession,
+    overrides: Record<string, unknown> = {},
+  ) {
+    const internal = session as unknown as {
+      localStream: MediaStream;
+      pc: RTCPeerConnection;
+      dc: RTCDataChannel;
+      remoteStream: MediaStream;
+      clockSamples: ClockProbeSample[];
+      statsPreflightComplete: boolean;
+      negotiation: { makingOffer: boolean; isSettingRemoteAnswerPending: boolean };
+      collectReadyFailures: () => string[];
+      evaluateReadyToObserve: () => void;
+    };
+    internal.localStream = {
+      getAudioTracks: () => [{ readyState: "live" }],
+    } as MediaStream;
+    internal.pc = {
+      connectionState: "connected",
+      iceConnectionState: "connected",
+      signalingState: "stable",
+    } as RTCPeerConnection;
+    internal.dc = { readyState: "open" } as RTCDataChannel;
+    internal.remoteStream = {
+      getAudioTracks: () => [{ readyState: "live" }],
+    } as MediaStream;
+    internal.clockSamples = [probeSample({ requesterRole: "peer_a", responderRole: "peer_b" })];
+    internal.statsPreflightComplete = true;
+    internal.negotiation = { makingOffer: false, isSettingRemoteAnswerPending: false };
+    Object.assign(internal, overrides);
+    return internal;
+  }
+
+  it("remote track only is not ready", () => {
+    const { session } = makeSession();
+    const internal = primeReadyInternals(session, {
+      clockSamples: [],
+      statsPreflightComplete: false,
+    });
+    internal.remoteStream = {
+      getAudioTracks: () => [{ readyState: "live" }],
+    } as MediaStream;
+    internal.localStream = { getAudioTracks: () => [] } as unknown as MediaStream;
+    expect(internal.collectReadyFailures().length).toBeGreaterThan(0);
+  });
+
+  it("data channel open without valid probe is not ready", () => {
+    const { session } = makeSession();
+    const internal = primeReadyInternals(session, { clockSamples: [] });
+    expect(internal.collectReadyFailures()).toContain("clock preflight incomplete");
+  });
+
+  it("valid probe without stats preflight is not ready", () => {
+    const { session } = makeSession();
+    const internal = primeReadyInternals(session, { statsPreflightComplete: false });
+    expect(internal.collectReadyFailures()).toContain("stats preflight incomplete");
+  });
+
+  it("stats preflight with ICE checking is not ready", () => {
+    const { session } = makeSession();
+    const internal = primeReadyInternals(session);
+    internal.pc = {
+      connectionState: "connected",
+      iceConnectionState: "checking",
+      signalingState: "stable",
+    } as RTCPeerConnection;
+    expect(internal.collectReadyFailures()).toContain("ICE not connected");
+  });
+
+  it("negotiation active is not ready", () => {
+    const { session } = makeSession();
+    const internal = primeReadyInternals(session);
+    internal.negotiation = { makingOffer: true, isSettingRemoteAnswerPending: false };
+    expect(internal.collectReadyFailures()).toContain("negotiation in progress");
+  });
+
+  it("sets ready_to_observe exactly once when all invariants pass", () => {
+    const { session, callbacks } = makeSession();
+    const internal = primeReadyInternals(session);
+    internal.evaluateReadyToObserve();
+    internal.evaluateReadyToObserve();
+    expect(callbacks.onPhaseChange).toHaveBeenCalledWith("ready_to_observe");
+    expect(
+      callbacks.onPhaseChange.mock.calls.filter(([phase]) => phase === "ready_to_observe"),
+    ).toHaveLength(1);
+  });
 
   it("passes ready gate after valid local probe and stats preflight", async () => {
     const { session } = makeSession();

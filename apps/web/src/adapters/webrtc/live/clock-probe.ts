@@ -3,6 +3,8 @@ import type { ClockProbeSample, PeerRole } from "./types";
 export const CLOCK_PROBE_PROTOCOL_VERSION = 1;
 export const MAX_PROBE_PAYLOAD_BYTES = 512;
 export const PROBE_TIMEOUT_MS = 5000;
+/** JSON-serialization tolerance for stored vs canonical clock metrics (milliseconds). */
+export const CLOCK_METRIC_EPSILON_MS = 1e-6;
 
 interface ProbeRequest {
   type: "clock_probe_request";
@@ -64,6 +66,44 @@ export function validateCrossDeviceClockTimestamps(
     rttMs: rtt,
     offsetMs: Number.isFinite(offset) ? offset : null,
   };
+}
+
+export function verifyStoredClockMetrics(
+  sample: Pick<ClockProbeSample, "t0" | "t1" | "t2" | "t3" | "rttMs" | "offsetMs">,
+): boolean {
+  if (
+    sample.t0 === null ||
+    sample.t1 === null ||
+    sample.t2 === null ||
+    sample.t3 === null ||
+    sample.rttMs === null
+  ) {
+    return false;
+  }
+  if (!Number.isFinite(sample.rttMs) || sample.rttMs < 0) {
+    return false;
+  }
+  const validation = validateCrossDeviceClockTimestamps(
+    sample.t0,
+    sample.t1,
+    sample.t2,
+    sample.t3,
+  );
+  if (!validation.valid || validation.rttMs === null) {
+    return false;
+  }
+  if (Math.abs(sample.rttMs - validation.rttMs) > CLOCK_METRIC_EPSILON_MS) {
+    return false;
+  }
+  if (sample.offsetMs !== null) {
+    if (!Number.isFinite(sample.offsetMs) || validation.offsetMs === null) {
+      return false;
+    }
+    if (Math.abs(sample.offsetMs - validation.offsetMs) > CLOCK_METRIC_EPSILON_MS) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export class ClockProbeEngine {
@@ -388,7 +428,13 @@ export function computeClockMedian(samples: ClockProbeSample[]): {
   madRtt: number | null;
 } {
   const valid = samples.filter(
-    (s) => !s.timeout && !s.duplicate && !s.unsolicited && !s.invalid && s.rttMs !== null,
+    (s) =>
+      !s.timeout &&
+      !s.duplicate &&
+      !s.unsolicited &&
+      !s.invalid &&
+      s.rttMs !== null &&
+      verifyStoredClockMetrics(s),
   );
   if (valid.length === 0) return { rtt: null, offset: null, madRtt: null };
   const rtts = valid.map((s) => s.rttMs!).sort((a, b) => a - b);
@@ -415,7 +461,13 @@ export function computeClockMedian(samples: ClockProbeSample[]): {
 
 export function validCompletedProbes(samples: ClockProbeSample[]): ClockProbeSample[] {
   return samples.filter(
-    (s) => !s.timeout && !s.duplicate && !s.unsolicited && !s.invalid && s.rttMs !== null,
+    (s) =>
+      !s.timeout &&
+      !s.duplicate &&
+      !s.unsolicited &&
+      !s.invalid &&
+      s.rttMs !== null &&
+      verifyStoredClockMetrics(s),
   );
 }
 

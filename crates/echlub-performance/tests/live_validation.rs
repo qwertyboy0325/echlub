@@ -1,7 +1,7 @@
 use echlub_performance::{
-    build_manifest_entries, pair_live_endpoints, validate_cross_device_clock_timestamps,
-    validate_live_endpoint, verify_live_artifact_manifest, LiveValidationError,
-    LIVE_SCHEMA_VERSION,
+    build_manifest_entries, compute_live_endpoint_derived, pair_live_endpoints,
+    validate_cross_device_clock_timestamps, validate_live_endpoint, verify_live_artifact_manifest,
+    LiveValidationError, LIVE_SCHEMA_VERSION,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -216,6 +216,73 @@ fn pair_rejects_same_role() {
     let json = read_vector("live-endpoint-peer-a-v1.json");
     let result = pair_live_endpoints(&json, &json);
     assert!(result.is_err());
+}
+
+#[test]
+fn rejects_rtt_mismatch_fixture() {
+    let json = read_vector("live-endpoint-rtt-mismatch-v1.json");
+    let result = validate_live_endpoint(&json, true);
+    assert!(!result.valid);
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, LiveValidationError::ClockRttMismatch)));
+}
+
+#[test]
+fn rejects_offset_mismatch_fixture() {
+    let json = read_vector("live-endpoint-offset-mismatch-v1.json");
+    let result = validate_live_endpoint(&json, true);
+    assert!(!result.valid);
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, LiveValidationError::ClockOffsetMismatch)));
+}
+
+#[test]
+fn rejects_negative_stored_rtt_fixture() {
+    let json = read_vector("live-endpoint-negative-stored-rtt-v1.json");
+    let result = validate_live_endpoint(&json, true);
+    assert!(!result.valid);
+    assert!(result.errors.iter().any(|e| {
+        matches!(
+            e,
+            LiveValidationError::ClockRttMismatch | LiveValidationError::InvalidClockProbe
+        )
+    }));
+}
+
+#[test]
+fn derived_clock_summary_excludes_invalid_probes() {
+    let json = read_vector("live-endpoint-finalized-peer-a-v1.json");
+    let mut value: serde_json::Value = serde_json::from_str(&json).unwrap();
+    value["clockProbes"]["samples"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "sequence": 999,
+            "requesterRole": "peer_a",
+            "responderRole": "peer_b",
+            "protocolVersion": 1,
+            "t0": 1000,
+            "t1": 1010,
+            "t2": 1011,
+            "t3": 1021,
+            "rttMs": 9999,
+            "offsetMs": 0.0,
+            "timeout": false,
+            "duplicate": true,
+            "unsolicited": false,
+            "invalid": false
+        }));
+    let baseline: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let baseline_summary = compute_live_endpoint_derived(&baseline);
+    let tampered_summary = compute_live_endpoint_derived(&value);
+    assert_eq!(
+        baseline_summary["medianClockProbeRttMs"],
+        tampered_summary["medianClockProbeRttMs"]
+    );
 }
 
 #[test]
