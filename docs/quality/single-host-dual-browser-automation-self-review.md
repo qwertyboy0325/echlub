@@ -36,3 +36,7 @@ Work package: `ECHLUB-SINGLE-HOST-DUAL-BROWSER-AUTOMATION-01`
 ## Claim boundary
 
 This review confirms implementation intent against the work package. It does **not** claim owner approval, merge readiness, or physical two-device observation completion.
+
+## Local E2E evidence
+
+Local headed run at commit `9d7361262d51945956bf19f7f624b386725eb020` produced `automation-report.json` with `result: PASS` for both connect-order scenarios. CI runs harness unit tests only (no headed E2E).
