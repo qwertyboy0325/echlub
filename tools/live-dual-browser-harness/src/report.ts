@@ -39,6 +39,32 @@ export interface AutomationReport {
   notes: string[];
 }
 
+function iceConnected(ice: string | null | undefined): boolean {
+  return ice === "connected" || ice === "completed";
+}
+
+export function classifyPeerRtpHarnessLimitation(peer: PeerDiagnostics): string | null {
+  const pf = peer.rtpPreflight;
+  if (!pf || pf.state !== "exhausted") return null;
+  if (peer.connection !== "connected") return null;
+  if (!iceConnected(peer.ice)) return null;
+  if (peer.dataChannel !== "open") return null;
+  if (peer.remoteTrackLive !== true) return null;
+  if ((pf.attempts ?? 0) < 1 || (pf.elapsed_ms ?? 0) < 25_000) return null;
+
+  const inbound = pf.inbound_audio_seen;
+  const outbound = pf.outbound_audio_seen;
+  if (inbound && outbound) return null;
+
+  if (!inbound && !outbound) {
+    return "bilateral_rtp_audio_stats_unavailable_under_fake_capture";
+  }
+  if (!inbound) {
+    return "inbound_rtp_audio_stats_unavailable_under_fake_capture";
+  }
+  return "outbound_rtp_audio_stats_unavailable_under_fake_capture";
+}
+
 export function createScenarioReport(
   order: ConnectOrder,
   outputDirectory: string,
@@ -74,27 +100,12 @@ export function allRequiredScenariosPassed(scenarios: ScenarioReport[]): boolean
   return scenarios.every((scenario) => scenario.result === "PASS" && scenarioMayPass(scenario));
 }
 
-export function classifyRtpHarnessLimitation(
-  peerA: { rtpPreflight?: PeerDiagnostics["rtpPreflight"]; connection: string | null; dataChannel: string | null },
-  peerB: { rtpPreflight?: PeerDiagnostics["rtpPreflight"]; connection: string | null; dataChannel: string | null },
-): string | null {
-  const peers = [peerA, peerB];
-  const allExhausted = peers.every((peer) => peer.rtpPreflight?.state === "exhausted");
-  const allConnected = peers.every(
-    (peer) => peer.connection === "connected" && peer.dataChannel === "open",
-  );
-  const boundedWindowCompleted = peers.every(
-    (peer) =>
-      (peer.rtpPreflight?.attempts ?? 0) >= 1 &&
-      (peer.rtpPreflight?.elapsed_ms ?? 0) >= 25_000,
-  );
-  const noRtpSeen = peers.every(
-    (peer) => !peer.rtpPreflight?.inbound_audio_seen && !peer.rtpPreflight?.outbound_audio_seen,
-  );
-  if (allExhausted && allConnected && boundedWindowCompleted && noRtpSeen) {
-    return "rtp_audio_stats_unavailable_under_fake_capture";
-  }
-  return null;
+export function classifyRtpHarnessLimitation(peerA: PeerDiagnostics, peerB: PeerDiagnostics): string | null {
+  const peerAReason = classifyPeerRtpHarnessLimitation(peerA);
+  const peerBReason = classifyPeerRtpHarnessLimitation(peerB);
+  if (!peerAReason || !peerBReason) return null;
+  if (peerAReason === peerBReason) return peerAReason;
+  return "bilateral_rtp_audio_stats_unavailable_under_fake_capture";
 }
 
 export function buildAutomationReport(input: {

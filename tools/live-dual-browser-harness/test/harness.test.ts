@@ -327,3 +327,242 @@ describe("actual endpoint start delta", () => {
     }
   });
 });
+
+function basePeerDiagnostics(
+  overrides: Partial<import("../src/constants.js").PeerDiagnostics> = {},
+): import("../src/constants.js").PeerDiagnostics {
+  return {
+    phase: "Ready To Observe",
+    connection: "connected",
+    ice: "connected",
+    dataChannel: "open",
+    samples: "0",
+    probes: "3",
+    remoteTrackLive: true,
+    error: null,
+    console: [],
+    pageErrors: [],
+    rtpPreflight: {
+      state: "exhausted",
+      attempts: 60,
+      inbound_audio_seen: false,
+      outbound_audio_seen: false,
+      elapsed_ms: 30_000,
+      failure_reason: "bounded RTP preflight window exhausted",
+      sanitized_report_shapes: [],
+    },
+    ...overrides,
+  };
+}
+
+describe("RTP harness limitation classifier", () => {
+  it("classifies neither direction seen as HARNESS_LIMITATION", async () => {
+    const { classifyRtpHarnessLimitation } = await import("../src/report.js");
+    const peer = basePeerDiagnostics();
+    expect(classifyRtpHarnessLimitation(peer, peer)).toBe(
+      "bilateral_rtp_audio_stats_unavailable_under_fake_capture",
+    );
+  });
+
+  it("classifies outbound only as HARNESS_LIMITATION", async () => {
+    const { classifyRtpHarnessLimitation } = await import("../src/report.js");
+    const peer = basePeerDiagnostics({
+      rtpPreflight: {
+        state: "exhausted",
+        attempts: 60,
+        inbound_audio_seen: false,
+        outbound_audio_seen: true,
+        elapsed_ms: 30_000,
+        failure_reason: "bounded RTP preflight window exhausted",
+        sanitized_report_shapes: [],
+      },
+    });
+    expect(classifyRtpHarnessLimitation(peer, peer)).toBe(
+      "inbound_rtp_audio_stats_unavailable_under_fake_capture",
+    );
+  });
+
+  it("classifies inbound only as HARNESS_LIMITATION", async () => {
+    const { classifyRtpHarnessLimitation } = await import("../src/report.js");
+    const peer = basePeerDiagnostics({
+      rtpPreflight: {
+        state: "exhausted",
+        attempts: 60,
+        inbound_audio_seen: true,
+        outbound_audio_seen: false,
+        elapsed_ms: 30_000,
+        failure_reason: "bounded RTP preflight window exhausted",
+        sanitized_report_shapes: [],
+      },
+    });
+    expect(classifyRtpHarnessLimitation(peer, peer)).toBe(
+      "outbound_rtp_audio_stats_unavailable_under_fake_capture",
+    );
+  });
+
+  it("does not classify when both directions seen but Ready failed elsewhere", async () => {
+    const { classifyRtpHarnessLimitation } = await import("../src/report.js");
+    const peer = basePeerDiagnostics({
+      rtpPreflight: {
+        state: "exhausted",
+        attempts: 60,
+        inbound_audio_seen: true,
+        outbound_audio_seen: true,
+        elapsed_ms: 30_000,
+        failure_reason: "bounded RTP preflight window exhausted",
+        sanitized_report_shapes: [],
+      },
+    });
+    expect(classifyRtpHarnessLimitation(peer, peer)).toBeNull();
+  });
+
+  it("does not classify when remote track is not live", async () => {
+    const { classifyRtpHarnessLimitation } = await import("../src/report.js");
+    const peer = basePeerDiagnostics({ remoteTrackLive: false });
+    expect(classifyRtpHarnessLimitation(peer, peer)).toBeNull();
+  });
+
+  it("does not classify when connection is not connected", async () => {
+    const { classifyRtpHarnessLimitation } = await import("../src/report.js");
+    const peer = basePeerDiagnostics({ connection: "disconnected" });
+    expect(classifyRtpHarnessLimitation(peer, peer)).toBeNull();
+  });
+
+  it("does not classify when bounded window is incomplete", async () => {
+    const { classifyRtpHarnessLimitation } = await import("../src/report.js");
+    const peer = basePeerDiagnostics({
+      rtpPreflight: {
+        state: "exhausted",
+        attempts: 1,
+        inbound_audio_seen: false,
+        outbound_audio_seen: false,
+        elapsed_ms: 1000,
+        failure_reason: "bounded RTP preflight window exhausted",
+        sanitized_report_shapes: [],
+      },
+    });
+    expect(classifyRtpHarnessLimitation(peer, peer)).toBeNull();
+  });
+});
+
+describe("harness ready guard", () => {
+  it("passes Ready with preflight available and zero observation samples", async () => {
+    const { evaluatePeerReadyGuardFailures } = await import("../src/peer-runner.js");
+    expect(
+      evaluatePeerReadyGuardFailures(
+        {
+          phase: "Ready To Observe",
+          connection: "connected",
+          ice: "connected",
+          dataChannel: "open",
+          samples: "0",
+          probes: "3",
+          remoteTrackLive: true,
+          error: null,
+          console: [],
+          pageErrors: [],
+          rtpPreflight: {
+            state: "available",
+            attempts: 2,
+            inbound_audio_seen: true,
+            outbound_audio_seen: true,
+            elapsed_ms: 500,
+            failure_reason: null,
+            sanitized_report_shapes: [],
+          },
+        },
+        "peer_a",
+      ),
+    ).toEqual([]);
+  });
+
+  it("fails Ready when preflight is probing", async () => {
+    const { evaluatePeerReadyGuardFailures } = await import("../src/peer-runner.js");
+    expect(
+      evaluatePeerReadyGuardFailures(
+        {
+          phase: "Ready To Observe",
+          connection: "connected",
+          ice: "connected",
+          dataChannel: "open",
+          samples: "0",
+          probes: "3",
+          remoteTrackLive: true,
+          error: null,
+          console: [],
+          pageErrors: [],
+          rtpPreflight: {
+            state: "probing",
+            attempts: 1,
+            inbound_audio_seen: false,
+            outbound_audio_seen: false,
+            elapsed_ms: 100,
+            failure_reason: null,
+            sanitized_report_shapes: [],
+          },
+        },
+        "peer_a",
+      ),
+    ).toContain("peer_a RTP preflight not available");
+  });
+
+  it("fails Ready when preflight is exhausted", async () => {
+    const { evaluatePeerReadyGuardFailures } = await import("../src/peer-runner.js");
+    expect(
+      evaluatePeerReadyGuardFailures(
+        {
+          phase: "Ready To Observe",
+          connection: "connected",
+          ice: "connected",
+          dataChannel: "open",
+          samples: "0",
+          probes: "3",
+          remoteTrackLive: true,
+          error: null,
+          console: [],
+          pageErrors: [],
+          rtpPreflight: {
+            state: "exhausted",
+            attempts: 60,
+            inbound_audio_seen: false,
+            outbound_audio_seen: true,
+            elapsed_ms: 30_000,
+            failure_reason: "bounded RTP preflight window exhausted",
+            sanitized_report_shapes: [],
+          },
+        },
+        "peer_a",
+      ),
+    ).toContain("peer_a RTP preflight not available");
+  });
+
+  it("fails Ready when remote track is not live", async () => {
+    const { evaluatePeerReadyGuardFailures } = await import("../src/peer-runner.js");
+    expect(
+      evaluatePeerReadyGuardFailures(
+        {
+          phase: "Ready To Observe",
+          connection: "connected",
+          ice: "connected",
+          dataChannel: "open",
+          samples: "0",
+          probes: "3",
+          remoteTrackLive: false,
+          error: null,
+          console: [],
+          pageErrors: [],
+          rtpPreflight: {
+            state: "available",
+            attempts: 2,
+            inbound_audio_seen: true,
+            outbound_audio_seen: true,
+            elapsed_ms: 500,
+            failure_reason: null,
+            sanitized_report_shapes: [],
+          },
+        },
+        "peer_a",
+      ),
+    ).toContain("peer_a remote audio track missing");
+  });
+});

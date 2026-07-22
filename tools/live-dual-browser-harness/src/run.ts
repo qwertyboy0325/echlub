@@ -51,6 +51,7 @@ function emptyDiagnostics(error: string): PeerDiagnostics {
     dataChannel: null,
     samples: null,
     probes: null,
+    remoteTrackLive: null,
     error,
     console: [],
     pageErrors: [],
@@ -189,9 +190,26 @@ async function runScenario(options: {
       markStepFailed(report, "directoryVerification");
     }
   } finally {
+    if (peerA !== null && peerB !== null) {
+      try {
+        peerADiagnostics = await snapshotPeerDiagnostics(peerA);
+        peerBDiagnostics = await snapshotPeerDiagnostics(peerB);
+      } catch (error) {
+        diagnosticCaptureFailed = true;
+        const message = error instanceof Error ? error.message : String(error);
+        peerADiagnostics = emptyDiagnostics(`peer diagnostic snapshot failed: ${message}`);
+        peerBDiagnostics = emptyDiagnostics(`peer diagnostic snapshot failed: ${message}`);
+      }
+    }
+
     if (peerA !== null) {
       try {
-        peerADiagnostics = await capturePeerArtifacts(peerA, layout.diagnosticsDir, "peer-a");
+        peerADiagnostics = await capturePeerArtifacts(
+          peerA,
+          layout.diagnosticsDir,
+          "peer-a",
+          peerADiagnostics,
+        );
       } catch (error) {
         diagnosticCaptureFailed = true;
         const message = error instanceof Error ? error.message : String(error);
@@ -212,7 +230,12 @@ async function runScenario(options: {
 
     if (peerB !== null) {
       try {
-        peerBDiagnostics = await capturePeerArtifacts(peerB, layout.diagnosticsDir, "peer-b");
+        peerBDiagnostics = await capturePeerArtifacts(
+          peerB,
+          layout.diagnosticsDir,
+          "peer-b",
+          peerBDiagnostics,
+        );
       } catch (error) {
         diagnosticCaptureFailed = true;
         const message = error instanceof Error ? error.message : String(error);

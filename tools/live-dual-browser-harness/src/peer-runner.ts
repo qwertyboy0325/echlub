@@ -85,12 +85,50 @@ export async function waitForReady(page: Page, timeoutMs = READY_TIMEOUT_MS): Pr
     if (diagnostics.phase?.includes("Ready To Observe")) {
       return;
     }
-    if (diagnostics.rtpPreflight?.state === "exhausted") {
+    await sleep(500);
+  }
+  await panel.getByText(/Phase: Ready To Observe/i).waitFor({ timeout: 1_000 });
+}
+
+type PeerPreflightWaitState = "pending" | "ready" | "exhausted";
+
+async function readPeerPreflightWaitState(page: Page): Promise<PeerPreflightWaitState> {
+  const diagnostics = await readDiagnostics(page);
+  if (diagnostics.phase?.includes("Ready To Observe")) {
+    return "ready";
+  }
+  if (diagnostics.rtpPreflight?.state === "exhausted") {
+    return "exhausted";
+  }
+  return "pending";
+}
+
+export async function waitForBothPeersReadyOrExhausted(
+  peerA: PeerSession,
+  peerB: PeerSession,
+  timeoutMs = READY_TIMEOUT_MS,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let peerAState: PeerPreflightWaitState = "pending";
+  let peerBState: PeerPreflightWaitState = "pending";
+
+  while (Date.now() < deadline) {
+    if (peerAState === "pending") {
+      peerAState = await readPeerPreflightWaitState(peerA.page);
+    }
+    if (peerBState === "pending") {
+      peerBState = await readPeerPreflightWaitState(peerB.page);
+    }
+    if (peerAState === "ready" && peerBState === "ready") {
+      return;
+    }
+    if (peerAState === "exhausted" && peerBState === "exhausted") {
       throw new Error("rtp_audio_stats_unavailable_under_fake_capture");
     }
     await sleep(500);
   }
-  await panel.getByText(/Phase: Ready To Observe/i).waitFor({ timeout: 1_000 });
+
+  throw new Error("ready timeout before both peers reached Ready or exhausted preflight");
 }
 
 export async function startObservation(page: Page): Promise<void> {
@@ -128,6 +166,11 @@ export async function readDiagnostics(page: Page): Promise<PeerDiagnostics> {
     ).__echlubLiveRtpPreflightDiagnostics;
     return reader?.() ?? null;
   });
+  const remoteTrackLive = await page.evaluate(() => {
+    const audio = document.getElementById("remote-audio") as HTMLAudioElement | null;
+    const stream = audio?.srcObject as MediaStream | null;
+    return Boolean(stream?.getAudioTracks().some((track) => track.readyState === "live"));
+  });
   return {
     phase,
     connection,
@@ -135,6 +178,7 @@ export async function readDiagnostics(page: Page): Promise<PeerDiagnostics> {
     dataChannel: dc,
     samples,
     probes,
+    remoteTrackLive,
     error,
     console: [],
     pageErrors: [],
@@ -142,12 +186,20 @@ export async function readDiagnostics(page: Page): Promise<PeerDiagnostics> {
   };
 }
 
+export async function snapshotPeerDiagnostics(session: PeerSession): Promise<PeerDiagnostics> {
+  const diagnostics = await readDiagnostics(session.page);
+  diagnostics.console = [...session.consoleLogs];
+  diagnostics.pageErrors = [...session.pageErrors];
+  return diagnostics;
+}
+
 export async function capturePeerArtifacts(
   session: PeerSession,
   diagnosticsDir: string,
   prefix: "peer-a" | "peer-b",
+  existingDiagnostics?: PeerDiagnostics,
 ): Promise<PeerDiagnostics> {
-  const diagnostics = await readDiagnostics(session.page);
+  const diagnostics = existingDiagnostics ?? (await readDiagnostics(session.page));
   diagnostics.console = [...session.consoleLogs];
   diagnostics.pageErrors = [...session.pageErrors];
   await session.page.screenshot({ path: join(diagnosticsDir, `${prefix}-screenshot.png`), fullPage: true });
@@ -195,24 +247,37 @@ export function assertObservationStartWindow(deltaMs: number, maxMs: number): vo
   }
 }
 
-export async function assertPeerReadyGuards(peer: PeerSession): Promise<void> {
-  const diagnostics = await readDiagnostics(peer.page);
+export function evaluatePeerReadyGuardFailures(
+  diagnostics: PeerDiagnostics,
+  role: "peer_a" | "peer_b",
+): string[] {
+  const failures: string[] = [];
+  if (diagnostics.rtpPreflight?.state !== "available") {
+    failures.push(`${role} RTP preflight not available`);
+  }
+  if (diagnostics.connection !== "connected") {
+    failures.push(`${role} connection not connected`);
+  }
+  if (diagnostics.ice !== "connected" && diagnostics.ice !== "completed") {
+    failures.push(`${role} ICE not connected`);
+  }
   if (diagnostics.dataChannel !== "open") {
-    throw new Error(`${peer.role} DataChannel not open`);
+    failures.push(`${role} DataChannel not open`);
   }
   if (!diagnostics.probes || Number(diagnostics.probes) < 1) {
-    throw new Error(`${peer.role} clock preflight incomplete`);
+    failures.push(`${role} clock preflight incomplete`);
   }
-  if (!diagnostics.samples || Number(diagnostics.samples) < 1) {
-    throw new Error(`${peer.role} stats preflight incomplete`);
+  if (diagnostics.remoteTrackLive !== true) {
+    failures.push(`${role} remote audio track missing`);
   }
-  const hasRemoteAudio = await peer.page.evaluate(() => {
-    const audio = document.getElementById("remote-audio") as HTMLAudioElement | null;
-    const stream = audio?.srcObject as MediaStream | null;
-    return Boolean(stream?.getAudioTracks().some((track) => track.readyState === "live"));
-  });
-  if (!hasRemoteAudio) {
-    throw new Error(`${peer.role} remote audio track missing`);
+  return failures;
+}
+
+export async function assertPeerReadyGuards(peer: PeerSession): Promise<void> {
+  const diagnostics = await readDiagnostics(peer.page);
+  const failures = evaluatePeerReadyGuardFailures(diagnostics, peer.role);
+  if (failures.length > 0) {
+    throw new Error(failures[0] ?? `${peer.role} ready guard failed`);
   }
 }
 
@@ -237,7 +302,7 @@ export function assertEndpointNegotiationRoles(peerAPath: string, peerBPath: str
 }
 
 export async function assertPeerReadyStates(peerA: PeerSession, peerB: PeerSession): Promise<void> {
-  await Promise.all([waitForReady(peerA.page), waitForReady(peerB.page)]);
+  await waitForBothPeersReadyOrExhausted(peerA, peerB);
   await assertPeerReadyGuards(peerA);
   await assertPeerReadyGuards(peerB);
 }

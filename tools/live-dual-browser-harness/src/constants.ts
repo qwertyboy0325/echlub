@@ -28,6 +28,7 @@ export interface PeerDiagnostics {
   dataChannel: string | null;
   samples: string | null;
   probes: string | null;
+  remoteTrackLive: boolean | null;
   error: string | null;
   console: string[];
   pageErrors: string[];

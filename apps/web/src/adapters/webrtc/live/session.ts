@@ -141,7 +141,7 @@ export class LiveWebRtcSession {
       onPeerJoined: (peerId) => this.handlePeerJoined(peerId),
       onPeerLeft: () => {
         this.peerPresent = false;
-        this.resetStatsPreflight();
+        this.invalidateStatsPreflight("peer left");
       },
       onError: this.callbacks.onError,
     });
@@ -297,7 +297,8 @@ export class LiveWebRtcSession {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
-    this.cancelStatsPreflight("session stopped");
+    this.invalidateStatsPreflight("session stopped");
+    this.resetStatsPreflight();
     this.clockEngine?.stop();
     this.statsSampler?.stop();
     this.localStream?.getTracks().forEach((t) => t.stop());
@@ -332,7 +333,7 @@ export class LiveWebRtcSession {
         this.setPhase("connected");
         this.evaluateReadyToObserve();
       } else if (state === "disconnected" || state === "failed" || state === "closed") {
-        this.cancelStatsPreflight(`peer connection ${state}`);
+        this.invalidateStatsPreflight(`peer connection ${state}`);
       }
     };
     pc.oniceconnectionstatechange = () => {
@@ -343,7 +344,7 @@ export class LiveWebRtcSession {
         pc.iceConnectionState === "failed" ||
         pc.iceConnectionState === "closed"
       ) {
-        this.cancelStatsPreflight(`ICE ${pc.iceConnectionState}`);
+        this.invalidateStatsPreflight(`ICE ${pc.iceConnectionState}`);
       } else {
         this.evaluateReadyToObserve();
       }
@@ -362,6 +363,12 @@ export class LiveWebRtcSession {
         (event.track ? new MediaStream([event.track]) : remoteAudioStreamFromReceivers(pc));
       if (this.remoteStream) {
         this.callbacks.onRemoteStream(this.remoteStream);
+        const remoteTrack = this.remoteStream.getAudioTracks()[0];
+        if (remoteTrack) {
+          remoteTrack.onended = () => {
+            this.invalidateStatsPreflight("remote audio track ended");
+          };
+        }
       }
       this.evaluateReadyToObserve();
     };
@@ -402,14 +409,16 @@ export class LiveWebRtcSession {
     };
     channel.onclosing = () => {
       this.setDataChannelReadyState("closing");
+      this.invalidateStatsPreflight("data channel closing");
     };
     channel.onclose = () => {
       this.setDataChannelReadyState("closed");
       this.callbacks.onDataChannelState("closed");
-      this.cancelStatsPreflight("data channel closed");
+      this.invalidateStatsPreflight("data channel closed");
     };
     channel.onerror = () => {
       this.setDataChannelReadyState("closed");
+      this.invalidateStatsPreflight("data channel error");
     };
   }
 
@@ -504,6 +513,7 @@ export class LiveWebRtcSession {
   }
 
   private evaluateReadyToObserve(): void {
+    if (this.stopped) return;
     this.ensureStatsPreflight();
     if (!this.remoteStream && this.pc) {
       const receiverStream = remoteAudioStreamFromReceivers(this.pc);
@@ -525,7 +535,7 @@ export class LiveWebRtcSession {
   }
 
   private canStartStatsPreflight(): boolean {
-    if (this.stopped || !this.pc) return false;
+    if (this.stopped || !this.pc || !this.peerPresent) return false;
     if (this.pc.connectionState !== "connected") return false;
     const ice = this.pc.iceConnectionState;
     if (ice !== "connected" && ice !== "completed") return false;
@@ -540,14 +550,16 @@ export class LiveWebRtcSession {
     this.statsPreflight = null;
   }
 
-  private cancelStatsPreflight(reason: string): void {
-    this.statsPreflight?.cancel(reason);
+  private invalidateStatsPreflight(reason: string): void {
+    this.statsPreflight?.invalidate(reason);
+    this.evaluateReadyToObserve();
   }
 
   private ensureStatsPreflight(): void {
     if (!this.canStartStatsPreflight()) {
-      if (this.statsPreflight?.getState() === "probing") {
-        this.cancelStatsPreflight("preflight prerequisites lost");
+      const state = this.statsPreflight?.getState();
+      if (state === "probing" || state === "available" || state === "exhausted") {
+        this.invalidateStatsPreflight("preflight prerequisites lost");
       }
       return;
     }
@@ -560,7 +572,12 @@ export class LiveWebRtcSession {
         },
       );
     }
-    this.statsPreflight?.maybeStart();
+    const state = this.statsPreflight?.getState();
+    if (state === "cancelled" || state === "idle") {
+      this.statsPreflight?.restartWhenIdle();
+    } else if (state !== "available" && state !== "probing" && state !== "exhausted") {
+      this.statsPreflight?.maybeStart();
+    }
   }
 
   private assertReadyToObserve(): void {
@@ -572,6 +589,7 @@ export class LiveWebRtcSession {
 
   private collectReadyFailures(): string[] {
     const failures: string[] = [];
+    if (!this.peerPresent) failures.push("peer not present");
     const micTrack = this.localStream?.getAudioTracks()[0];
     if (!micTrack || micTrack.readyState !== "live") failures.push("microphone track not live");
     if (this.pc?.connectionState !== "connected") failures.push("peer connection not connected");

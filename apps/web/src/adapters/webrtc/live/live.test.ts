@@ -725,6 +725,8 @@ describe("session ready gate and export", () => {
       getState: (): "idle" | "probing" | "available" | "exhausted" | "cancelled" => state,
       maybeStart: vi.fn(),
       cancel: vi.fn(),
+      invalidate: vi.fn(),
+      restartWhenIdle: vi.fn(),
       reset: vi.fn(),
       getDiagnostics: () => ({
         state,
@@ -743,6 +745,7 @@ describe("session ready gate and export", () => {
     overrides: Record<string, unknown> = {},
   ) {
     const internal = session as unknown as {
+      peerPresent: boolean;
       localStream: MediaStream;
       pc: RTCPeerConnection;
       dc: RTCDataChannel;
@@ -753,6 +756,7 @@ describe("session ready gate and export", () => {
       collectReadyFailures: () => string[];
       evaluateReadyToObserve: () => void;
     };
+    internal.peerPresent = true;
     internal.localStream = {
       getAudioTracks: () => [{ readyState: "live" }],
     } as MediaStream;
@@ -829,6 +833,7 @@ describe("session ready gate and export", () => {
   it("passes ready gate after valid local probe and stats preflight", async () => {
     const { session } = makeSession();
     const internal = session as unknown as {
+      peerPresent: boolean;
       localStream: MediaStream;
       pc: RTCPeerConnection;
       dc: RTCDataChannel;
@@ -837,6 +842,7 @@ describe("session ready gate and export", () => {
       statsPreflight: ReturnType<typeof mockPreflight> | null;
       collectReadyFailures: () => string[];
     };
+    internal.peerPresent = true;
     internal.localStream = {
       getAudioTracks: () => [{ readyState: "live" }],
     } as MediaStream;
@@ -1271,6 +1277,130 @@ describe("bounded RTP stats preflight polling", () => {
     await vi.runAllTimersAsync();
     expect(getStats).toHaveBeenCalled();
     expect(controller.getDiagnostics().attempts).toBeGreaterThan(0);
+    vi.useRealTimers();
+  });
+
+  it("invalidates available state on disconnect invalidate", async () => {
+    vi.useFakeTimers();
+    const controller = new RtpStatsPreflightController(
+      mockPc([rtpAudioStats({ inbound: true, outbound: true })]),
+      { intervalMs: 100, maximumDurationMs: 1000, maximumAttempts: 10 },
+      { now: () => 0 },
+    );
+    controller.maybeStart();
+    await vi.runAllTimersAsync();
+    expect(controller.getState()).toBe("available");
+    controller.invalidate("ICE disconnected");
+    expect(controller.getState()).toBe("cancelled");
+    expect(controller.getDiagnostics().inbound_audio_seen).toBe(false);
+    expect(controller.getDiagnostics().outbound_audio_seen).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("restarts from cancelled after reconnect without reusing old RTP observations", async () => {
+    vi.useFakeTimers();
+    const pc = mockPc([
+      rtpAudioStats({ outbound: true }),
+      transportOnlyStats(),
+      rtpAudioStats({ inbound: true, outbound: true }),
+    ]);
+    const controller = new RtpStatsPreflightController(
+      pc,
+      { intervalMs: 100, maximumDurationMs: 1000, maximumAttempts: 10 },
+      { now: () => 0 },
+    );
+    controller.maybeStart();
+    await vi.advanceTimersByTimeAsync(100);
+    controller.invalidate("ICE disconnected");
+    expect(controller.getDiagnostics().outbound_audio_seen).toBe(false);
+    controller.restartWhenIdle();
+    await vi.runAllTimersAsync();
+    expect(controller.getState()).toBe("available");
+    expect(controller.getDiagnostics().inbound_audio_seen).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("does not start a second getStats while the first call is still pending", async () => {
+    const getStats = vi.fn(
+      () =>
+        new Promise<Map<string, Record<string, unknown>>>((resolve) => {
+          setTimeout(() => resolve(transportOnlyStats()), 50);
+        }),
+    );
+    const pc = { getStats } as unknown as RTCPeerConnection;
+    const controller = new RtpStatsPreflightController(pc, {
+      intervalMs: 10,
+      maximumDurationMs: 1000,
+      maximumAttempts: 5,
+    });
+    controller.maybeStart();
+    controller.invalidate("ICE disconnected");
+    controller.restartWhenIdle();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(getStats).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(getStats.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("ignores stale getStats results after invalidate", async () => {
+    let resolveStats: ((value: Map<string, Record<string, unknown>>) => void) | undefined;
+    const pc = {
+      getStats: vi.fn(
+        () =>
+          new Promise<Map<string, Record<string, unknown>>>((resolve) => {
+            resolveStats = resolve;
+          }),
+      ),
+    } as unknown as RTCPeerConnection;
+    const controller = new RtpStatsPreflightController(pc, {
+      intervalMs: 100,
+      maximumDurationMs: 1000,
+      maximumAttempts: 3,
+    });
+    controller.maybeStart();
+    controller.invalidate("ICE disconnected");
+    resolveStats?.(rtpAudioStats({ inbound: true, outbound: true }));
+    await Promise.resolve();
+    expect(controller.getState()).toBe("cancelled");
+    expect(controller.getDiagnostics().inbound_audio_seen).toBe(false);
+  });
+
+  it("restarts bounded polling after exhausted when invalidated for new connection generation", async () => {
+    vi.useFakeTimers();
+    const controller = new RtpStatsPreflightController(
+      mockPc(Array.from({ length: 5 }, () => transportOnlyStats())),
+      { intervalMs: 100, maximumDurationMs: 400, maximumAttempts: 5 },
+      { now: () => 0 },
+    );
+    controller.maybeStart();
+    await vi.runAllTimersAsync();
+    expect(controller.getState()).toBe("exhausted");
+    controller.invalidate("peer connection disconnected");
+    expect(controller.getState()).toBe("cancelled");
+    controller.restartWhenIdle();
+    await vi.runAllTimersAsync();
+    expect(controller.getDiagnostics().attempts).toBeGreaterThan(0);
+    vi.useRealTimers();
+  });
+
+  it("does not combine inbound from old generation with outbound from new generation", async () => {
+    vi.useFakeTimers();
+    const pc = mockPc([
+      rtpAudioStats({ inbound: true }),
+      transportOnlyStats(),
+      rtpAudioStats({ outbound: true }),
+    ]);
+    const controller = new RtpStatsPreflightController(
+      pc,
+      { intervalMs: 100, maximumDurationMs: 1000, maximumAttempts: 10 },
+      { now: () => 0 },
+    );
+    controller.maybeStart();
+    await vi.advanceTimersByTimeAsync(100);
+    controller.invalidate("ICE disconnected");
+    controller.restartWhenIdle();
+    await vi.runAllTimersAsync();
+    expect(controller.getState()).not.toBe("available");
     vi.useRealTimers();
   });
 });

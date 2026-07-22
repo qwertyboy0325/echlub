@@ -113,6 +113,8 @@ export class RtpStatsPreflightController {
   private sanitizedShapes: SanitizedReportShape[] = [];
   private retryHandle: ReturnType<typeof setTimeout> | null = null;
   private inFlight = false;
+  private inFlightGeneration: number | null = null;
+  private restartWhenIdleRequested = false;
   private readonly now: () => number;
   private readonly scheduleRetry: (delayMs: number, callback: () => void) => ReturnType<typeof setTimeout>;
   private readonly clearRetry: (handle: ReturnType<typeof setTimeout>) => void;
@@ -133,6 +135,10 @@ export class RtpStatsPreflightController {
     return this.state;
   }
 
+  get inFlightCall(): boolean {
+    return this.inFlight;
+  }
+
   getDiagnostics(): RtpPreflightDiagnostics {
     const elapsed =
       this.firstAttemptAt === null ? 0 : Math.max(0, this.elapsedSinceStart());
@@ -148,49 +154,70 @@ export class RtpStatsPreflightController {
   }
 
   maybeStart(): void {
-    if (this.state === "available" || this.state === "probing") return;
-    if (this.state === "exhausted" || this.state === "cancelled") return;
+    if (this.state === "available" || this.state === "exhausted") return;
+    if (this.state === "probing" && !this.inFlight) return;
+    if (this.inFlight) {
+      this.restartWhenIdleRequested = true;
+      return;
+    }
+    if (this.state === "idle") {
+      this.startNewGeneration();
+    }
+  }
+
+  invalidate(reason: string): void {
+    this.clearPendingRetry();
+    this.generation += 1;
+    this.state = "cancelled";
+    this.failureReason = reason;
+    this.resetGenerationObservations();
+    this.onUpdate();
+  }
+
+  restartWhenIdle(): void {
+    if (this.inFlight) {
+      this.restartWhenIdleRequested = true;
+      return;
+    }
+    if (this.state === "available") return;
+    this.startNewGeneration();
+  }
+
+  reset(): void {
+    this.clearPendingRetry();
+    this.generation += 1;
+    this.state = "idle";
+    this.failureReason = null;
+    this.resetGenerationObservations();
+    this.restartWhenIdleRequested = false;
+    this.onUpdate();
+  }
+
+  /** @deprecated use invalidate */
+  cancel(reason = "cancelled"): void {
+    this.invalidate(reason);
+  }
+
+  private startNewGeneration(): void {
     this.beginGeneration();
     this.state = "probing";
     this.failureReason = null;
     void this.runAttempt();
   }
 
-  cancel(reason = "cancelled"): void {
-    this.clearPendingRetry();
-    this.inFlight = false;
-    this.generation += 1;
-    if (this.state !== "available") {
-      this.state = "cancelled";
-      this.failureReason = reason;
-    }
-    this.onUpdate();
-  }
-
-  reset(): void {
-    this.cancel("reset");
-    this.state = "idle";
-    this.attemptCount = 0;
-    this.firstAttemptAt = null;
-    this.lastAttemptAt = null;
-    this.inboundAudioSeen = false;
-    this.outboundAudioSeen = false;
-    this.sanitizedShapes = [];
-    this.failureReason = null;
-    this.onUpdate();
-  }
-
   private beginGeneration(): void {
     this.generation += 1;
+    this.resetGenerationObservations();
+    this.clearPendingRetry();
+  }
+
+  private resetGenerationObservations(): void {
     this.attemptCount = 0;
     this.firstAttemptAt = null;
     this.lastAttemptAt = null;
     this.inboundAudioSeen = false;
     this.outboundAudioSeen = false;
     this.sanitizedShapes = [];
-    this.failureReason = null;
-    this.clearPendingRetry();
-    this.inFlight = false;
   }
 
   private elapsedSinceStart(): number {
@@ -239,12 +266,25 @@ export class RtpStatsPreflightController {
     return true;
   }
 
+  private finishInFlight(token: number): void {
+    if (this.inFlightGeneration !== token) return;
+    this.inFlight = false;
+    this.inFlightGeneration = null;
+    if (this.restartWhenIdleRequested) {
+      this.restartWhenIdleRequested = false;
+      if (this.state !== "available") {
+        this.startNewGeneration();
+      }
+    }
+  }
+
   private async runAttempt(): Promise<void> {
     if (this.state !== "probing") return;
     if (this.inFlight) return;
 
     const token = this.generation;
     this.inFlight = true;
+    this.inFlightGeneration = token;
     const attemptStartedAt = this.now();
     if (this.firstAttemptAt === null) {
       this.firstAttemptAt = attemptStartedAt;
@@ -291,9 +331,7 @@ export class RtpStatsPreflightController {
       this.onUpdate();
       this.scheduleNextAttempt();
     } finally {
-      if (token === this.generation) {
-        this.inFlight = false;
-      }
+      this.finishInFlight(token);
     }
   }
 }
