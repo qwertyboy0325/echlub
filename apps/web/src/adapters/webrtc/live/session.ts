@@ -217,7 +217,16 @@ export class LiveWebRtcSession {
     if (localProbes.length < LiveWebRtcSession.MIN_FINALIZED_PROBES) {
       throw new Error("insufficient valid local clock probes for finalized export");
     }
-    return this.buildEndpointExport(true);
+    return this.finalizeEndpointExport(this.buildEndpointExport(true));
+  }
+
+  private finalizeEndpointExport(exported: Record<string, unknown>): Record<string, unknown> {
+    const roundTripped = JSON.parse(JSON.stringify(exported)) as Record<string, unknown>;
+    const clockProbes = roundTripped.clockProbes as { samples?: import("./types").ClockProbeSample[] } | undefined;
+    if (clockProbes?.samples) {
+      clockProbes.samples = clockProbes.samples.map(canonicalizeClockProbeSampleForExport);
+    }
+    return roundTripped;
   }
 
   private buildEndpointExport(finalized: boolean): Record<string, unknown> {
