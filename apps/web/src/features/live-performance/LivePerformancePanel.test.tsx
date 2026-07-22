@@ -23,8 +23,8 @@ describe("LivePerformancePanel", () => {
     expect(micButton).not.toBeDisabled();
   });
 
-  it("disables export until completed phase", () => {
+  it("disables finalized export until completed phase", () => {
     render(<LivePerformancePanel />);
-    expect(screen.getByRole("button", { name: /Export Endpoint/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Export Finalized Endpoint/i })).toBeDisabled();
   });
 });

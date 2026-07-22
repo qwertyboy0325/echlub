@@ -127,15 +127,82 @@ def main() -> int:
                     "test-vectors/performance/live-endpoint-peer-a-v1.json",
                 ],
             ),
+            (
+                "live finalized positive fixture",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-finalized-peer-a-v1.json",
+                ],
+            ),
+            (
+                "live invalid clock-only fixture reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-invalid-clock-only-v1.json",
+                ],
+            ),
+            (
+                "live timestamp reversal fixture reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-timestamp-reversal-v1.json",
+                ],
+            ),
+            (
+                "live draft-as-final reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-draft-as-final-v1.json",
+                ],
+            ),
+            (
+                "live directory manifest verification",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "verify-live-directory",
+                    "test-vectors/performance/live-directory-v1",
+                ],
+            ),
         ]
     )
+
+    expect_fail_labels = {
+        "performance zero-detection assess fail",
+        "live invalid clock-only fixture reject",
+        "live timestamp reversal fixture reject",
+        "live draft-as-final reject",
+    }
 
     if not args.skip_references:
         steps.append(("reference cleanliness (end)", ["python3", "scripts/check-references.py"]))
 
     failed = []
     for label, cmd in steps:
-        if label == "performance zero-detection assess fail":
+        if label in expect_fail_labels:
             ok = run_expect_fail(label, cmd)
         else:
             ok = run(label, cmd)

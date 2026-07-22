@@ -120,10 +120,27 @@ export function LivePerformancePanel() {
     if (observeTimer.current) clearInterval(observeTimer.current);
   }, []);
 
-  const exportEvidence = useCallback(() => {
-    const draft = sessionRef.current?.exportEndpointDraft();
-    if (!draft) return;
-    downloadJson(`${role}-${correlationId.slice(0, 8)}.json`, draft);
+  const exportFinalized = useCallback(() => {
+    try {
+      const endpoint = sessionRef.current?.exportFinalizedEndpoint();
+      if (!endpoint) return;
+      if (endpoint.exportKind !== "finalized") {
+        throw new Error("finalized export produced non-finalized artifact");
+      }
+      downloadJson(`${role}-${correlationId.slice(0, 8)}-finalized.json`, endpoint);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [correlationId, role]);
+
+  const exportDiagnosticDraft = useCallback(() => {
+    try {
+      const draft = sessionRef.current?.exportEndpointDraft();
+      if (!draft) return;
+      downloadJson(`${role}-${correlationId.slice(0, 8)}-diagnostic_draft.json`, draft);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }, [correlationId, role]);
 
   const disconnect = useCallback(() => {
@@ -189,7 +206,10 @@ export function LivePerformancePanel() {
         <button onClick={enableMic} disabled={!canEnableMic}>Enable Microphone</button>
         <button onClick={connect} disabled={!canConnect}>Connect</button>
         <button onClick={startObservation} disabled={!canObserve}>Start 60s Observation</button>
-        <button onClick={exportEvidence} disabled={!canExport}>Export Endpoint</button>
+        <button onClick={exportFinalized} disabled={!canExport}>Export Finalized Endpoint</button>
+        <button onClick={exportDiagnosticDraft} disabled={phase === "idle" || phase === "stopped"}>
+          Export Diagnostic Draft
+        </button>
         <button onClick={disconnect} disabled={!canStop}>Disconnect</button>
         <button onClick={reset}>Reset</button>
       </div>

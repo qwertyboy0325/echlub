@@ -8,7 +8,7 @@ interface ProbeRequest {
   type: "clock_probe_request";
   protocolVersion: number;
   sequence: number;
-  senderRole: PeerRole;
+  requesterRole: PeerRole;
   t0: number;
 }
 
@@ -16,11 +16,31 @@ interface ProbeResponse {
   type: "clock_probe_response";
   protocolVersion: number;
   sequence: number;
-  senderRole: PeerRole;
+  requesterRole: PeerRole;
   responderRole: PeerRole;
   t0: number;
   t1: number;
   t2: number;
+}
+
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).length;
+}
+
+function oppositeRole(role: PeerRole): PeerRole {
+  return role === "peer_a" ? "peer_b" : "peer_a";
+}
+
+function isFiniteTimestampChain(t0: number, t1: number, t2: number, t3: number): boolean {
+  return (
+    Number.isFinite(t0) &&
+    Number.isFinite(t1) &&
+    Number.isFinite(t2) &&
+    Number.isFinite(t3) &&
+    t0 <= t1 &&
+    t1 <= t2 &&
+    t2 <= t3
+  );
 }
 
 export class ClockProbeEngine {
@@ -31,6 +51,7 @@ export class ClockProbeEngine {
   private pending = new Map<string, { t0: number; timeoutId: ReturnType<typeof setTimeout> }>();
   private sentSequences = new Set<string>();
   private respondedSequences = new Set<string>();
+  private completedResponses = new Set<string>();
   private nextSequence = 0;
   private config = { intervalMs: 1000, count: 30 };
 
@@ -81,10 +102,38 @@ export class ClockProbeEngine {
     this.channel = null;
     this.sentSequences.clear();
     this.respondedSequences.clear();
+    this.completedResponses.clear();
   }
 
   private sequenceKey(role: PeerRole, sequence: number): string {
     return `${role}:${sequence}`;
+  }
+
+  private invalidSample(
+    sequence: number,
+    requesterRole: PeerRole,
+    protocolVersion: number,
+    t0: number,
+    t1: number | null = null,
+    t2: number | null = null,
+    t3: number | null = null,
+    flags: Partial<Pick<ClockProbeSample, "duplicate" | "unsolicited">> = {},
+  ): ClockProbeSample {
+    return {
+      sequence,
+      senderRole: requesterRole,
+      protocolVersion,
+      t0,
+      t1,
+      t2,
+      t3,
+      rttMs: null,
+      offsetMs: null,
+      timeout: false,
+      duplicate: flags.duplicate ?? false,
+      unsolicited: flags.unsolicited ?? false,
+      invalid: true,
+    };
   }
 
   private sendProbe(): void {
@@ -96,28 +145,14 @@ export class ClockProbeEngine {
       type: "clock_probe_request",
       protocolVersion: CLOCK_PROBE_PROTOCOL_VERSION,
       sequence,
-      senderRole: this.localRole,
+      requesterRole: this.localRole,
       t0,
     };
     const encoded = JSON.stringify(payload);
-    if (encoded.length > MAX_PROBE_PAYLOAD_BYTES) return;
+    if (utf8ByteLength(encoded) > MAX_PROBE_PAYLOAD_BYTES) return;
 
     if (this.sentSequences.has(key)) {
-      this.onSample({
-        sequence,
-        senderRole: this.localRole,
-        protocolVersion: CLOCK_PROBE_PROTOCOL_VERSION,
-        t0,
-        t1: null,
-        t2: null,
-        t3: null,
-        rttMs: null,
-        offsetMs: null,
-        timeout: false,
-        duplicate: true,
-        unsolicited: false,
-        invalid: true,
-      });
+      this.onSample(this.invalidSample(sequence, this.localRole, CLOCK_PROBE_PROTOCOL_VERSION, t0, null, null, null, { duplicate: true }));
       return;
     }
     this.sentSequences.add(key);
@@ -148,26 +183,25 @@ export class ClockProbeEngine {
     try {
       const msg = JSON.parse(raw) as ProbeRequest | ProbeResponse;
       if (msg.protocolVersion !== CLOCK_PROBE_PROTOCOL_VERSION) {
-        this.onSample({
-          sequence: "sequence" in msg ? msg.sequence : -1,
-          senderRole: "senderRole" in msg ? msg.senderRole : this.localRole,
-          protocolVersion: msg.protocolVersion ?? 0,
-          t0: "t0" in msg ? msg.t0 : 0,
-          t1: null,
-          t2: null,
-          t3: null,
-          rttMs: null,
-          offsetMs: null,
-          timeout: false,
-          duplicate: false,
-          unsolicited: false,
-          invalid: true,
-        });
+        const requesterRole =
+          "requesterRole" in msg && msg.requesterRole ? msg.requesterRole : this.localRole;
+        this.onSample(
+          this.invalidSample(
+            "sequence" in msg ? msg.sequence : -1,
+            requesterRole,
+            msg.protocolVersion ?? 0,
+            "t0" in msg && Number.isFinite(msg.t0) ? msg.t0 : 0,
+          ),
+        );
         return;
       }
 
       if (msg.type === "clock_probe_request" && "t0" in msg) {
-        const key = this.sequenceKey(msg.senderRole, msg.sequence);
+        if (msg.requesterRole === this.localRole) return;
+        if (msg.requesterRole !== oppositeRole(this.localRole)) return;
+        if (!Number.isFinite(msg.t0)) return;
+
+        const key = this.sequenceKey(msg.requesterRole, msg.sequence);
         if (this.respondedSequences.has(key)) return;
         this.respondedSequences.add(key);
         const t1 = performance.timeOrigin + performance.now();
@@ -176,107 +210,104 @@ export class ClockProbeEngine {
           type: "clock_probe_response",
           protocolVersion: CLOCK_PROBE_PROTOCOL_VERSION,
           sequence: msg.sequence,
-          senderRole: msg.senderRole,
+          requesterRole: msg.requesterRole,
           responderRole: this.localRole,
           t0: msg.t0,
           t1,
           t2,
         };
-        this.channel?.send(JSON.stringify(response));
+        const encoded = JSON.stringify(response);
+        if (utf8ByteLength(encoded) > MAX_PROBE_PAYLOAD_BYTES) return;
+        this.channel?.send(encoded);
       } else if (msg.type === "clock_probe_response") {
-        if (msg.senderRole === this.localRole) {
-          this.onSample({
-            sequence: msg.sequence,
-            senderRole: msg.senderRole,
-            protocolVersion: msg.protocolVersion,
-            t0: msg.t0,
-            t1: msg.t1,
-            t2: msg.t2,
-            t3: null,
-            rttMs: null,
-            offsetMs: null,
-            timeout: false,
-            duplicate: false,
-            unsolicited: true,
-            invalid: true,
-          });
+        const { requesterRole, responderRole, sequence, t0, t1, t2 } = msg;
+
+        if (requesterRole !== this.localRole) {
+          this.onSample(
+            this.invalidSample(sequence, requesterRole, msg.protocolVersion, t0, t1, t2, null),
+          );
           return;
         }
 
-        const key = this.sequenceKey(msg.senderRole, msg.sequence);
-        const pending = this.pending.get(key);
-        if (!pending) {
-          this.onSample({
-            sequence: msg.sequence,
-            senderRole: msg.senderRole,
-            protocolVersion: msg.protocolVersion,
-            t0: msg.t0,
-            t1: msg.t1,
-            t2: msg.t2,
-            t3: null,
-            rttMs: null,
-            offsetMs: null,
-            timeout: false,
-            duplicate: false,
-            unsolicited: true,
-            invalid: true,
-          });
+        if (responderRole !== oppositeRole(this.localRole)) {
+          this.onSample(
+            this.invalidSample(sequence, requesterRole, msg.protocolVersion, t0, t1, t2, null),
+          );
           return;
         }
 
-        if (this.respondedSequences.has(`${key}:local`)) {
+        const key = this.sequenceKey(this.localRole, sequence);
+        const responseKey = `${key}:response`;
+        if (this.completedResponses.has(responseKey)) {
           this.onSample({
-            sequence: msg.sequence,
-            senderRole: msg.senderRole,
+            sequence,
+            senderRole: requesterRole,
             protocolVersion: msg.protocolVersion,
-            t0: msg.t0,
-            t1: msg.t1,
-            t2: msg.t2,
+            t0,
+            t1,
+            t2,
             t3: null,
             rttMs: null,
             offsetMs: null,
             timeout: false,
             duplicate: true,
             unsolicited: false,
-            invalid: true,
+            invalid: false,
           });
           return;
         }
-        this.respondedSequences.add(`${key}:local`);
 
-        clearTimeout(pending.timeoutId);
-        this.pending.delete(key);
-        const t3 = performance.timeOrigin + performance.now();
-        const rtt = t3 - msg.t0 - (msg.t2 - msg.t1);
-        const offset = (msg.t1 - msg.t0 + (msg.t2 - t3)) / 2;
-        if (rtt < 0) {
+        const pending = this.pending.get(key);
+        if (!pending) {
           this.onSample({
-            sequence: msg.sequence,
-            senderRole: msg.senderRole,
+            sequence,
+            senderRole: requesterRole,
             protocolVersion: msg.protocolVersion,
-            t0: msg.t0,
-            t1: msg.t1,
-            t2: msg.t2,
-            t3,
+            t0,
+            t1,
+            t2,
+            t3: null,
             rttMs: null,
             offsetMs: null,
             timeout: false,
             duplicate: false,
-            unsolicited: false,
-            invalid: true,
+            unsolicited: true,
+            invalid: false,
           });
           return;
         }
+
+        clearTimeout(pending.timeoutId);
+        this.pending.delete(key);
+        const t3 = performance.timeOrigin + performance.now();
+
+        if (!isFiniteTimestampChain(t0, t1, t2, t3)) {
+          this.onSample(
+            this.invalidSample(sequence, requesterRole, msg.protocolVersion, t0, t1, t2, t3),
+          );
+          return;
+        }
+
+        const rtt = t3 - t0 - (t2 - t1);
+        if (!Number.isFinite(rtt) || rtt < 0) {
+          this.onSample(
+            this.invalidSample(sequence, requesterRole, msg.protocolVersion, t0, t1, t2, t3),
+          );
+          return;
+        }
+
+        this.completedResponses.add(responseKey);
+        const offset = (t1 - t0 + (t2 - t3)) / 2;
         this.onSample({
-          sequence: msg.sequence,
-          senderRole: msg.senderRole,
+          sequence,
+          senderRole: requesterRole,
           protocolVersion: msg.protocolVersion,
-          t0: msg.t0,
-          t1: msg.t1,
-          t2: msg.t2,
+          t0,
+          t1,
+          t2,
           t3,
           rttMs: rtt,
-          offsetMs: offset,
+          offsetMs: Number.isFinite(offset) ? offset : null,
           timeout: false,
           duplicate: false,
           unsolicited: false,
@@ -299,14 +330,19 @@ export function computeClockMedian(samples: ClockProbeSample[]): {
   );
   if (valid.length === 0) return { rtt: null, offset: null, madRtt: null };
   const rtts = valid.map((s) => s.rttMs!).sort((a, b) => a - b);
-  const offsets = valid.map((s) => s.offsetMs ?? 0).sort((a, b) => a - b);
+  const offsets = valid
+    .map((s) => s.offsetMs)
+    .filter((v): v is number => v !== null)
+    .sort((a, b) => a - b);
   const mid = Math.floor(rtts.length / 2);
   const rtt =
     rtts.length % 2 === 0 ? (rtts[mid - 1]! + rtts[mid]!) / 2 : rtts[mid]!;
   const offset =
-    offsets.length % 2 === 0
-      ? (offsets[mid - 1]! + offsets[mid]!) / 2
-      : offsets[mid]!;
+    offsets.length === 0
+      ? null
+      : offsets.length % 2 === 0
+        ? (offsets[mid - 1]! + offsets[mid]!) / 2
+        : offsets[mid]!;
   const deviations = rtts.map((v) => Math.abs(v - rtt)).sort((a, b) => a - b);
   const madRtt =
     deviations.length % 2 === 0
@@ -319,4 +355,11 @@ export function validCompletedProbes(samples: ClockProbeSample[]): ClockProbeSam
   return samples.filter(
     (s) => !s.timeout && !s.duplicate && !s.unsolicited && !s.invalid && s.rttMs !== null,
   );
+}
+
+export function validLocalCompletedProbes(
+  samples: ClockProbeSample[],
+  localRole: PeerRole,
+): ClockProbeSample[] {
+  return validCompletedProbes(samples).filter((s) => s.senderRole === localRole);
 }

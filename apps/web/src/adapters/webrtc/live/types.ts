@@ -26,11 +26,13 @@ export type LiveSessionPhase =
   | "failed"
   | "stopped";
 
-export interface MetricValue {
-  kind: "observed" | "unsupported" | "unavailable" | "invalid";
-  value?: number;
-  reason?: string;
-}
+export type MetricValue =
+  | { kind: "observed_number"; value: number }
+  | { kind: "observed_boolean"; value: boolean }
+  | { kind: "observed_category"; value: string }
+  | { kind: "unsupported" }
+  | { kind: "unavailable"; reason: string }
+  | { kind: "invalid"; reason: string };
 
 export interface ClockProbeSample {
   sequence: number;
@@ -90,8 +92,21 @@ export function generateSessionCorrelationId(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+export function observedNumber(value: number): MetricValue {
+  return { kind: "observed_number", value };
+}
+
+export function observedBoolean(value: boolean): MetricValue {
+  return { kind: "observed_boolean", value };
+}
+
+export function observedCategory(value: string): MetricValue {
+  return { kind: "observed_category", value };
+}
+
+/** @deprecated use observedNumber */
 export function observed(value: number): MetricValue {
-  return { kind: "observed", value };
+  return observedNumber(value);
 }
 
 export function unsupported(): MetricValue {
@@ -106,8 +121,20 @@ export function invalid(reason: string): MetricValue {
   return { kind: "invalid", reason };
 }
 
+export function isObservedNumber(
+  metric: MetricValue,
+): metric is { kind: "observed_number"; value: number } {
+  return metric.kind === "observed_number";
+}
+
 export const CANDIDATE_CATEGORIES = ["host", "srflx", "prflx", "relay"] as const;
 export type CandidateCategory = (typeof CANDIDATE_CATEGORIES)[number];
+
+export const CONNECTION_STATE_CATEGORIES = ["succeeded", "in-progress"] as const;
+export type ConnectionStateCategory = (typeof CONNECTION_STATE_CATEGORIES)[number];
+
+export const TRANSPORT_PROTOCOL_CATEGORIES = ["udp", "tcp"] as const;
+export type TransportProtocolCategory = (typeof TRANSPORT_PROTOCOL_CATEGORIES)[number];
 
 export function captureConstraints(profile: CaptureProfile): MediaTrackConstraints {
   if (profile === "music_low_latency") {

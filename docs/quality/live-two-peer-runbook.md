@@ -32,9 +32,9 @@ Open `http://localhost:5173` on the peer device. Enter `ws://<HOST_LAN_IP>:8080/
 3. Generate/copy the same session correlation ID on both devices.
 4. Assign `peer_a` on host, `peer_b` on peer; same capture profile.
 5. Acknowledge headphones, prepare, enable microphone, connect.
-6. Wait for **Ready To Observe** (clock warmup probes must succeed).
+6. Wait for **Ready To Observe** (clock warmup probes and stats preflight must succeed).
 7. Run 60-second observation on both.
-8. Export endpoint artifacts from each device.
+8. Export **Finalized Endpoint** artifacts from each device (not diagnostic draft).
 9. Copy to `.local/live-observation-import/peer-a.json` and `peer-b.json` (gitignored; never commit).
 
 Do not expose port 8080 to the public Internet.

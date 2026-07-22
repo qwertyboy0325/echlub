@@ -1,4 +1,13 @@
-import { observed, unavailable, unsupported, type MetricValue } from "./types";
+import {
+  invalid,
+  isObservedNumber,
+  observedBoolean,
+  observedCategory,
+  observedNumber,
+  unsupported,
+  unavailable,
+  type MetricValue,
+} from "./types";
 
 export interface NormalizedStatsSample {
   offsetMs: number;
@@ -10,29 +19,51 @@ export interface NormalizedStatsSample {
   intervalMetrics?: Record<string, MetricValue>;
 }
 
-const CANDIDATE_TYPE_MAP: Record<string, number> = {
-  host: 1,
-  srflx: 2,
-  prflx: 3,
-  relay: 4,
-};
+const CANDIDATE_TYPES = new Set(["host", "srflx", "prflx", "relay"]);
+const CONNECTION_STATES = new Set(["succeeded", "in-progress"]);
+const TRANSPORT_PROTOCOLS = new Set(["udp", "tcp"]);
 
-function metricFromReport(report: Record<string, unknown>, key: string): MetricValue {
+function metricNumberFromReport(report: Record<string, unknown>, key: string): MetricValue {
   const val = report[key];
   if (typeof val === "number" && Number.isFinite(val)) {
-    return observed(val);
-  }
-  if (typeof val === "boolean") {
-    return observed(val ? 1 : 0);
+    return observedNumber(val);
   }
   if (val === undefined) return unsupported();
-  return unavailable("not exposed");
+  return invalid("expected finite number");
+}
+
+function metricBooleanFromReport(report: Record<string, unknown>, key: string): MetricValue {
+  const val = report[key];
+  if (typeof val === "boolean") {
+    return observedBoolean(val);
+  }
+  if (val === undefined) return unsupported();
+  return invalid("expected boolean");
 }
 
 function sanitizeCandidateType(report: Record<string, unknown>): MetricValue {
   const t = report.candidateType;
-  if (typeof t === "string" && t in CANDIDATE_TYPE_MAP) {
-    return observed(CANDIDATE_TYPE_MAP[t]!);
+  if (typeof t === "string" && CANDIDATE_TYPES.has(t)) {
+    return observedCategory(t);
+  }
+  return unsupported();
+}
+
+function sanitizeConnectionState(report: Record<string, unknown>): MetricValue {
+  const state = report.state;
+  if (typeof state === "string" && CONNECTION_STATES.has(state)) {
+    return observedCategory(state);
+  }
+  if (typeof state === "string") {
+    return invalid(`unexpected connection state: ${state}`);
+  }
+  return unsupported();
+}
+
+function sanitizeProtocol(report: Record<string, unknown>): MetricValue {
+  const protocol = report.protocol;
+  if (typeof protocol === "string" && TRANSPORT_PROTOCOLS.has(protocol)) {
+    return observedCategory(protocol);
   }
   return unsupported();
 }
@@ -40,7 +71,7 @@ function sanitizeCandidateType(report: Record<string, unknown>): MetricValue {
 function sanitizeCodecMime(report: Record<string, unknown>): MetricValue {
   const mime = report.mimeType;
   if (typeof mime === "string" && mime.startsWith("audio/")) {
-    return observed(1);
+    return observedCategory(mime);
   }
   return unsupported();
 }
@@ -68,58 +99,58 @@ export async function collectNormalizedStats(
       if (pairId && reports.has(pairId)) {
         const pair = reports.get(pairId)!;
         candidatePair = {
-          state: metricFromReport(pair, "state"),
-          nominated: metricFromReport(pair, "nominated"),
-          protocol: unavailable("category only"),
+          state: sanitizeConnectionState(pair),
+          nominated: metricBooleanFromReport(pair, "nominated"),
+          protocol: sanitizeProtocol(pair),
           localCandidateType: sanitizeCandidateType(
             reports.get(String(pair.localCandidateId)) ?? {},
           ),
           remoteCandidateType: sanitizeCandidateType(
             reports.get(String(pair.remoteCandidateId)) ?? {},
           ),
-          currentRoundTripTime: metricFromReport(pair, "currentRoundTripTime"),
-          packetsSent: metricFromReport(pair, "packetsSent"),
-          packetsReceived: metricFromReport(pair, "packetsReceived"),
-          bytesSent: metricFromReport(pair, "bytesSent"),
-          bytesReceived: metricFromReport(pair, "bytesReceived"),
+          currentRoundTripTime: metricNumberFromReport(pair, "currentRoundTripTime"),
+          packetsSent: metricNumberFromReport(pair, "packetsSent"),
+          packetsReceived: metricNumberFromReport(pair, "packetsReceived"),
+          bytesSent: metricNumberFromReport(pair, "bytesSent"),
+          bytesReceived: metricNumberFromReport(pair, "bytesReceived"),
         };
       }
     }
     if (report.type === "inbound-rtp" && report.kind === "audio") {
       inboundAudio = {
-        packetsReceived: metricFromReport(report, "packetsReceived"),
-        packetsLost: metricFromReport(report, "packetsLost"),
-        jitter: metricFromReport(report, "jitter"),
-        jitterBufferDelay: metricFromReport(report, "jitterBufferDelay"),
-        jitterBufferTargetDelay: metricFromReport(report, "jitterBufferTargetDelay"),
-        jitterBufferMinimumDelay: metricFromReport(report, "jitterBufferMinimumDelay"),
-        bytesReceived: metricFromReport(report, "bytesReceived"),
-        concealedSamples: metricFromReport(report, "concealedSamples"),
-        totalSamplesReceived: metricFromReport(report, "totalSamplesReceived"),
-        audioLevel: metricFromReport(report, "audioLevel"),
+        packetsReceived: metricNumberFromReport(report, "packetsReceived"),
+        packetsLost: metricNumberFromReport(report, "packetsLost"),
+        jitter: metricNumberFromReport(report, "jitter"),
+        jitterBufferDelay: metricNumberFromReport(report, "jitterBufferDelay"),
+        jitterBufferTargetDelay: metricNumberFromReport(report, "jitterBufferDelay"),
+        jitterBufferMinimumDelay: metricNumberFromReport(report, "jitterBufferMinimumDelay"),
+        bytesReceived: metricNumberFromReport(report, "bytesReceived"),
+        concealedSamples: metricNumberFromReport(report, "concealedSamples"),
+        totalSamplesReceived: metricNumberFromReport(report, "totalSamplesReceived"),
+        audioLevel: metricNumberFromReport(report, "audioLevel"),
       };
     }
     if (report.type === "outbound-rtp" && report.kind === "audio") {
       outboundAudio = {
-        packetsSent: metricFromReport(report, "packetsSent"),
-        bytesSent: metricFromReport(report, "bytesSent"),
-        retransmittedPacketsSent: metricFromReport(report, "retransmittedPacketsSent"),
-        audioLevel: metricFromReport(report, "audioLevel"),
+        packetsSent: metricNumberFromReport(report, "packetsSent"),
+        bytesSent: metricNumberFromReport(report, "bytesSent"),
+        retransmittedPacketsSent: metricNumberFromReport(report, "retransmittedPacketsSent"),
+        audioLevel: metricNumberFromReport(report, "audioLevel"),
       };
     }
     if (report.type === "remote-inbound-rtp" && report.kind === "audio") {
       remoteInboundAudio = {
-        roundTripTime: metricFromReport(report, "roundTripTime"),
-        fractionLost: metricFromReport(report, "fractionLost"),
-        packetsLost: metricFromReport(report, "packetsLost"),
-        jitter: metricFromReport(report, "jitter"),
+        roundTripTime: metricNumberFromReport(report, "roundTripTime"),
+        fractionLost: metricNumberFromReport(report, "fractionLost"),
+        packetsLost: metricNumberFromReport(report, "packetsLost"),
+        jitter: metricNumberFromReport(report, "jitter"),
       };
     }
     if (report.type === "codec") {
       codec = {
         mimeType: sanitizeCodecMime(report),
-        clockRate: metricFromReport(report, "clockRate"),
-        channels: metricFromReport(report, "channels"),
+        clockRate: metricNumberFromReport(report, "clockRate"),
+        channels: metricNumberFromReport(report, "channels"),
       };
     }
   }
@@ -140,6 +171,12 @@ export async function collectNormalizedStats(
   return sample;
 }
 
+export async function collectStatsPreflight(
+  pc: RTCPeerConnection,
+): Promise<NormalizedStatsSample> {
+  return collectNormalizedStats(pc, 0, null);
+}
+
 function computeIntervalMetrics(
   prev: NormalizedStatsSample,
   curr: NormalizedStatsSample,
@@ -148,27 +185,27 @@ function computeIntervalMetrics(
   if (dt <= 0) return {};
   const metrics: Record<string, MetricValue> = {};
   const rtt = curr.candidatePair.currentRoundTripTime;
-  if (rtt.kind === "observed" && rtt.value !== undefined) {
-    metrics.candidatePairRttMs = observed(rtt.value * 1000);
+  if (isObservedNumber(rtt)) {
+    metrics.candidatePairRttMs = observedNumber(rtt.value * 1000);
   }
   const recvDelta = deltaMetric(prev.inboundAudio.bytesReceived, curr.inboundAudio.bytesReceived);
   if (recvDelta !== null) {
-    metrics.receiveBitrateBps = observed((recvDelta * 8 * 1000) / dt);
+    metrics.receiveBitrateBps = observedNumber((recvDelta * 8 * 1000) / dt);
   }
   const sendDelta = deltaMetric(prev.outboundAudio.bytesSent, curr.outboundAudio.bytesSent);
   if (sendDelta !== null) {
-    metrics.sendBitrateBps = observed((sendDelta * 8 * 1000) / dt);
+    metrics.sendBitrateBps = observedNumber((sendDelta * 8 * 1000) / dt);
   }
   const lossDelta = deltaMetric(prev.inboundAudio.packetsLost, curr.inboundAudio.packetsLost);
   if (lossDelta !== null) {
-    metrics.packetLossDelta = observed(lossDelta);
+    metrics.packetLossDelta = observedNumber(lossDelta);
   }
   return metrics;
 }
 
 function deltaMetric(prev: MetricValue, curr: MetricValue): number | null {
-  if (prev.kind !== "observed" || curr.kind !== "observed") return null;
-  const delta = (curr.value ?? 0) - (prev.value ?? 0);
+  if (!isObservedNumber(prev) || !isObservedNumber(curr)) return null;
+  const delta = curr.value - prev.value;
   return delta >= 0 ? delta : null;
 }
 

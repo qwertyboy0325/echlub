@@ -1,6 +1,6 @@
 use echlub_performance::{
-    assess_synthetic_observation, pair_live_endpoints, parse_and_validate,
-    parse_and_validate_live_endpoint, summarize_run, validate_live_directory,
+    assess_synthetic_observation, build_manifest_entries, checksum_bytes, pair_live_endpoints,
+    parse_and_validate, parse_and_validate_live_endpoint, summarize_run, validate_live_directory,
     validate_live_endpoint, validate_run, PerformanceRunV1,
 };
 use std::env;
@@ -20,7 +20,8 @@ Commands:\n\
   validate-live-draft <file>\n\
   summarize-live-endpoint <file> [--output <dir>]\n\
   pair-live-endpoints <peer-a.json> <peer-b.json> [--output <dir>]\n\
-  verify-live-directory <dir>"
+  verify-live-directory <dir>\n\
+  checksum-file <file>"
     );
     process::exit(1);
 }
@@ -52,6 +53,7 @@ fn main() {
             pair_files(peer_a, peer_b, &out);
         }
         "verify-live-directory" => verify_live_dir(require_path(&args, 2)),
+        "checksum-file" => checksum_file(require_path(&args, 2)),
         _ => usage(),
     }
 }
@@ -189,9 +191,16 @@ fn pair_files(peer_a: &Path, peer_b: &Path, out_dir: &Path) {
     )
     .unwrap();
     fs::write(out_dir.join("report.md"), &artifacts.report_markdown).unwrap();
+
+    let manifest = build_manifest_entries(
+        out_dir,
+        &artifacts.pair.pair_id,
+        &artifacts.pair.session_correlation_id,
+        &artifacts.pair.software_commit,
+    );
     fs::write(
         out_dir.join("artifact-manifest.json"),
-        serde_json::to_string_pretty(&artifacts.manifest).unwrap(),
+        serde_json::to_string_pretty(&manifest).unwrap(),
     )
     .unwrap();
     println!("Paired artifacts written to {}", out_dir.display());
@@ -238,6 +247,14 @@ fn verify_live_dir(dir: &Path) {
         }
         process::exit(1);
     }
+}
+
+fn checksum_file(path: &Path) {
+    let bytes = fs::read(path).unwrap_or_else(|e| {
+        eprintln!("read error: {e}");
+        process::exit(1);
+    });
+    println!("{}", checksum_bytes(&bytes));
 }
 
 fn read_file(path: &Path) -> String {

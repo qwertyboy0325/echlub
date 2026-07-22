@@ -24,7 +24,7 @@ fn mad(values: &[f64], med: f64) -> Option<f64> {
 }
 
 fn metric_observed(value: f64) -> LiveMetricValue {
-    LiveMetricValue::Observed { value }
+    LiveMetricValue::ObservedNumber { value }
 }
 
 fn metric_unavailable(reason: &str) -> LiveMetricValue {

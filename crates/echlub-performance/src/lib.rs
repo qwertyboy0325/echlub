@@ -13,15 +13,17 @@ pub mod validate;
 pub use assess::{assess_run, assess_synthetic_observation, AssessmentError, AssessmentResult};
 pub use derived::compute_derived_metrics;
 pub use live_pair::{
-    pair_live_endpoints, validate_live_directory, PairArtifacts, PairValidationError,
+    build_manifest_entries, pair_live_endpoints, validate_live_directory, PairArtifacts,
+    PairValidationError,
 };
 pub use live_schema::{
     LiveEndpointObservationV1, LiveObservationPairV1, LivePeerRole, LIVE_PAIR_SCHEMA_VERSION,
     LIVE_SCHEMA_VERSION,
 };
 pub use live_validate::{
-    checksum_json, parse_and_validate_live_endpoint, validate_live_endpoint, LiveValidationError,
-    LiveValidationResult,
+    checksum_bytes, checksum_json, count_valid_local_probes, parse_and_validate_live_endpoint,
+    validate_live_endpoint, verify_live_artifact_manifest, LiveValidationError,
+    LiveValidationResult, MIN_CLOCK_PROBES, MIN_STATS_SAMPLES,
 };
 pub use schema::{
     EvidenceLevel, EvidenceStatus, MetricValue, PerformanceRunV1, RunMetadata,

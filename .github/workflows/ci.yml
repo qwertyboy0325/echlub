@@ -29,8 +29,32 @@ jobs:
         run: python3 scripts/verify.py --skip-references
       - name: Performance tests
         run: corepack pnpm performance:test
+      - name: Live tests
+        run: corepack pnpm live:test
       - name: Live draft endpoint vector validation
         run: cargo run -p echlub-performance-report -- validate-live-draft test-vectors/performance/live-endpoint-peer-a-v1.json
+      - name: Live finalized positive fixture
+        run: cargo run -p echlub-performance-report -- validate-live-endpoint test-vectors/performance/live-endpoint-finalized-peer-a-v1.json
+      - name: Live invalid clock-only fixture reject
+        run: |
+          if cargo run -p echlub-performance-report -- validate-live-endpoint test-vectors/performance/live-endpoint-invalid-clock-only-v1.json; then
+            echo "expected validation failure"
+            exit 1
+          fi
+      - name: Live timestamp reversal fixture reject
+        run: |
+          if cargo run -p echlub-performance-report -- validate-live-endpoint test-vectors/performance/live-endpoint-timestamp-reversal-v1.json; then
+            echo "expected validation failure"
+            exit 1
+          fi
+      - name: Live draft-as-final reject
+        run: |
+          if cargo run -p echlub-performance-report -- validate-live-endpoint test-vectors/performance/live-endpoint-draft-as-final-v1.json; then
+            echo "expected validation failure"
+            exit 1
+          fi
+      - name: Live directory manifest verification
+        run: cargo run -p echlub-performance-report -- verify-live-directory test-vectors/performance/live-directory-v1
       - name: Synthetic zero-detection assess fail
         run: |
           if cargo run -p echlub-performance-report -- assess-synthetic test-vectors/performance/synthetic-zero-detection-v1.json; then

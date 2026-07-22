@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import subprocess
@@ -37,14 +36,33 @@ def cargo_report_cmd(*args: str) -> list[str]:
 
 
 def blake3_hex(data: bytes) -> str:
-    proc = subprocess.run(
-        ["cargo", "run", "-q", "-p", "echlub-performance-report", "--", "validate", "/dev/null"],
-        cwd=ROOT,
-        capture_output=True,
-    )
-    if proc.returncode == 0:
-        pass
-    return hashlib.sha256(data).hexdigest()
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp.write(data)
+        path = tmp.name
+    try:
+        proc = subprocess.run(
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "echlub-performance-report",
+                "--",
+                "checksum-file",
+                path,
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(proc.stderr or "checksum-file failed")
+        return proc.stdout.strip()
+    finally:
+        Path(path).unlink(missing_ok=True)
 
 
 def start_preview() -> subprocess.Popen | None:
@@ -238,6 +256,16 @@ def main() -> int:
     if validate_ok:
         assess_ok = run("assess observation", cargo_report_cmd("assess-synthetic", str(artifact_path)))
 
+    if outcome == "harness_limitation" or not assess_ok:
+        write_report(
+            run_dir,
+            outcome="HARNESS_LIMITATION",
+            details=(
+                "Decoded remote media pulse detection did not meet PASS threshold. "
+                "Inbound RTP bytes may indicate media_path_live but are not used for pulse detection."
+            ),
+        )
+
     if not run("summarize observation", cargo_report_cmd("summarize", str(artifact_path))):
         return 1
 
@@ -262,14 +290,6 @@ def main() -> int:
     )
 
     if outcome == "harness_limitation" or not assess_ok:
-        write_report(
-            run_dir,
-            outcome="HARNESS_LIMITATION",
-            details=(
-                "Decoded remote media pulse detection did not meet PASS threshold. "
-                "Inbound RTP bytes may indicate media_path_live but are not used for pulse detection."
-            ),
-        )
         print("\nSYNTHETIC_DECODED_MEDIA_LIMITATION")
         return 2
 

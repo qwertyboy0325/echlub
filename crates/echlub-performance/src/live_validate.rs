@@ -1,6 +1,9 @@
 use crate::live_derived::compute_live_endpoint_derived;
 use crate::live_privacy::{contains_live_forbidden_content, scan_live_value_for_forbidden_keys};
-use crate::live_schema::{LiveEndpointObservationV1, LIVE_SCHEMA_VERSION};
+use crate::live_schema::{
+    LiveEndpointObservationV1, LiveMetricValue, CHECKSUM_ALGORITHM, CLOCK_PROBE_PROTOCOL_VERSION,
+    LIVE_MANIFEST_SCHEMA_VERSION, LIVE_SCHEMA_VERSION,
+};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use thiserror::Error;
@@ -28,20 +31,46 @@ pub enum LiveValidationError {
     InvalidPeerRole(String),
     #[error("invalid session correlation id")]
     InvalidSessionCorrelationId,
+    #[error("invalid export kind: {0}")]
+    InvalidExportKind(String),
+    #[error("invalid software commit")]
+    InvalidSoftwareCommit,
+    #[error("invalid timestamps")]
+    InvalidTimestamps,
     #[error("insufficient stats samples: {0}")]
     InsufficientStatsSamples(usize),
-    #[error("insufficient clock probes: {0}")]
+    #[error("insufficient valid local clock probes: {0}")]
     InsufficientClockProbes(usize),
     #[error("observation duration exceeds maximum")]
     ExcessiveDuration,
+    #[error("stats offsets not strictly monotonic")]
+    StatsOffsetsNotMonotonic,
+    #[error("stats offsets outside observation duration")]
+    StatsOffsetsOutOfBounds,
+    #[error("invalid clock probe sample")]
+    InvalidClockProbe,
     #[error("missing limitations")]
     MissingLimitations,
     #[error("connection not connected")]
     NotConnected,
+    #[error("ICE not connected")]
+    IceNotConnected,
+    #[error("signaling not stable")]
+    SignalingNotStable,
+    #[error("data channel not open")]
+    DataChannelNotOpen,
     #[error("remote audio track not reported")]
     NoRemoteAudio,
+    #[error("remote audio track not live")]
+    RemoteAudioNotLive,
     #[error("no packet progression")]
     NoPacketProgression,
+    #[error("manifest schema mismatch: {0}")]
+    ManifestSchemaMismatch(String),
+    #[error("checksum mismatch for {0}")]
+    ChecksumMismatch(String),
+    #[error("manifest verification failed: {0}")]
+    ManifestVerification(String),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -147,23 +176,124 @@ pub fn validate_live_endpoint(json: &str, require_finalized: bool) -> LiveValida
     }
 }
 
-fn validate_software_commit(value: &Value, errors: &mut Vec<LiveValidationError>) {
-    let commit = value.get("softwareCommit").and_then(|v| v.as_str());
-    match commit {
-        Some(c) if c.len() >= 7 && c != "unknown" && !c.contains("placeholder") => {}
-        _ => errors.push(LiveValidationError::MissingField("softwareCommit".into())),
-    }
+pub fn count_valid_local_probes(value: &Value) -> usize {
+    let peer_role = value
+        .get("peerRole")
+        .or_else(|| value.get("peer_role"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let samples = value
+        .pointer("/clockProbes/samples")
+        .or_else(|| value.pointer("/clock_probes/samples"))
+        .and_then(|v| v.as_array());
+    let Some(samples) = samples else {
+        return 0;
+    };
+    samples
+        .iter()
+        .filter(|sample| is_valid_completed_local_probe(sample, peer_role))
+        .count()
 }
 
-fn is_valid_correlation_id(corr: Option<&str>) -> bool {
-    match corr {
-        Some(id) if id.len() == 32 => id.chars().all(|c| c.is_ascii_hexdigit()),
+fn is_valid_completed_local_probe(sample: &Value, peer_role: &str) -> bool {
+    let requester = sample
+        .get("senderRole")
+        .or_else(|| sample.get("requesterRole"))
+        .or_else(|| sample.get("requester_role"))
+        .and_then(|v| v.as_str());
+    if requester != Some(peer_role) {
+        return false;
+    }
+    if sample.get("timeout").and_then(|v| v.as_bool()) != Some(false) {
+        return false;
+    }
+    if sample.get("duplicate").and_then(|v| v.as_bool()) != Some(false) {
+        return false;
+    }
+    if sample.get("unsolicited").and_then(|v| v.as_bool()) != Some(false) {
+        return false;
+    }
+    if sample.get("invalid").and_then(|v| v.as_bool()) != Some(false) {
+        return false;
+    }
+    let protocol = sample
+        .get("protocolVersion")
+        .or_else(|| sample.get("protocol_version"))
+        .and_then(|v| v.as_i64());
+    if protocol != Some(CLOCK_PROBE_PROTOCOL_VERSION) {
+        return false;
+    }
+    let rtt = sample.get("rttMs").or_else(|| sample.get("rtt_ms"));
+    if !rtt.map(|v| v.is_number()).unwrap_or(false) {
+        return false;
+    }
+    let t0 = sample.get("t0").and_then(|v| v.as_f64());
+    let t1 = sample.get("t1").and_then(|v| v.as_f64());
+    let t2 = sample.get("t2").and_then(|v| v.as_f64());
+    let t3 = sample.get("t3").and_then(|v| v.as_f64());
+    match (t0, t1, t2, t3) {
+        (Some(t0), Some(t1), Some(t2), Some(t3))
+            if t0.is_finite() && t1.is_finite() && t2.is_finite() && t3.is_finite() =>
+        {
+            if !(t0 <= t1 && t1 <= t2 && t2 <= t3) {
+                return false;
+            }
+            let rtt_val = rtt.and_then(|v| v.as_f64()).unwrap_or(f64::NAN);
+            if !rtt_val.is_finite() || rtt_val < 0.0 {
+                return false;
+            }
+            true
+        }
         _ => false,
     }
 }
 
 fn validate_finalized_requirements(value: &Value, errors: &mut Vec<LiveValidationError>) {
-    validate_software_commit(value, errors);
+    let export_kind = value
+        .get("exportKind")
+        .or_else(|| value.get("export_kind"))
+        .and_then(|v| v.as_str());
+    if export_kind != Some("finalized") {
+        errors.push(LiveValidationError::InvalidExportKind(
+            export_kind.unwrap_or("missing").into(),
+        ));
+    }
+
+    let commit = value.get("softwareCommit").and_then(|v| v.as_str());
+    if !commit
+        .map(|c| c.len() == 40 && c.chars().all(|ch| ch.is_ascii_hexdigit()))
+        .unwrap_or(false)
+    {
+        errors.push(LiveValidationError::InvalidSoftwareCommit);
+    }
+
+    let start = parse_utc(value.get("startedAtUtc").or(value.get("started_at_utc")));
+    let end = parse_utc(
+        value
+            .get("completedAtUtc")
+            .or(value.get("completed_at_utc")),
+    );
+    if let (Some(start), Some(end)) = (start, end) {
+        if end <= start {
+            errors.push(LiveValidationError::InvalidTimestamps);
+        } else {
+            let dur = (end - start).num_milliseconds() as f64 / 1000.0;
+            if dur <= 0.0 || dur > MAX_DURATION_SECONDS {
+                errors.push(LiveValidationError::ExcessiveDuration);
+            }
+            validate_stats_samples(value, dur, errors);
+        }
+    } else {
+        errors.push(LiveValidationError::InvalidTimestamps);
+    }
+
+    let valid_probes = count_valid_local_probes(value);
+    if valid_probes < MIN_CLOCK_PROBES {
+        errors.push(LiveValidationError::InsufficientClockProbes(valid_probes));
+    }
+
+    validate_clock_probe_samples(value, errors);
+
     let stats_len = value
         .get("statsSamples")
         .or_else(|| value.get("stats_samples"))
@@ -177,37 +307,36 @@ fn validate_finalized_requirements(value: &Value, errors: &mut Vec<LiveValidatio
         errors.push(LiveValidationError::ExcessiveDuration);
     }
 
-    let probe_len = value
-        .get("clockProbes")
-        .or_else(|| value.get("clock_probes"))
-        .and_then(|v| v.get("samples"))
-        .and_then(|v| v.as_array())
-        .map(|a| a.len())
-        .unwrap_or(0);
-    if probe_len < MIN_CLOCK_PROBES {
-        errors.push(LiveValidationError::InsufficientClockProbes(probe_len));
-    }
-
-    if let (Some(start), Some(end)) = (
-        parse_utc(value.get("startedAtUtc").or(value.get("started_at_utc"))),
-        parse_utc(
-            value
-                .get("completedAtUtc")
-                .or(value.get("completed_at_utc")),
-        ),
-    ) {
-        let dur = (end - start).num_milliseconds() as f64 / 1000.0;
-        if dur > MAX_DURATION_SECONDS {
-            errors.push(LiveValidationError::ExcessiveDuration);
-        }
-    }
-
     let conn_state = value
         .pointer("/connectionLifecycle/peerConnectionState")
         .or(value.pointer("/connection_lifecycle/peer_connection_state"))
         .and_then(|v| v.as_str());
     if conn_state != Some("connected") {
         errors.push(LiveValidationError::NotConnected);
+    }
+
+    let ice_state = value
+        .pointer("/connectionLifecycle/iceConnectionState")
+        .or(value.pointer("/connection_lifecycle/ice_connection_state"))
+        .and_then(|v| v.as_str());
+    if ice_state != Some("connected") && ice_state != Some("completed") {
+        errors.push(LiveValidationError::IceNotConnected);
+    }
+
+    let signaling_state = value
+        .pointer("/connectionLifecycle/signalingState")
+        .or(value.pointer("/connection_lifecycle/signaling_state"))
+        .and_then(|v| v.as_str());
+    if signaling_state != Some("stable") {
+        errors.push(LiveValidationError::SignalingNotStable);
+    }
+
+    let dc_state = value
+        .pointer("/dataChannel/readyState")
+        .or(value.pointer("/data_channel/ready_state"))
+        .and_then(|v| v.as_str());
+    if dc_state != Some("open") {
+        errors.push(LiveValidationError::DataChannelNotOpen);
     }
 
     let remote_track = value
@@ -218,8 +347,88 @@ fn validate_finalized_requirements(value: &Value, errors: &mut Vec<LiveValidatio
         errors.push(LiveValidationError::NoRemoteAudio);
     }
 
+    let remote_ready = value
+        .pointer("/playout/remoteAudioTrackReadyState")
+        .or(value.pointer("/playout/remote_audio_track_ready_state"))
+        .and_then(|v| v.as_str());
+    if remote_ready != Some("live") {
+        errors.push(LiveValidationError::RemoteAudioNotLive);
+    }
+
     if !has_packet_progression(value) {
         errors.push(LiveValidationError::NoPacketProgression);
+    }
+}
+
+fn validate_clock_probe_samples(value: &Value, errors: &mut Vec<LiveValidationError>) {
+    let peer_role = value
+        .get("peerRole")
+        .or_else(|| value.get("peer_role"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let samples = value
+        .pointer("/clockProbes/samples")
+        .or_else(|| value.pointer("/clock_probes/samples"))
+        .and_then(|v| v.as_array());
+    let Some(samples) = samples else {
+        errors.push(LiveValidationError::InvalidClockProbe);
+        return;
+    };
+    for sample in samples {
+        let requester = sample
+            .get("senderRole")
+            .or_else(|| sample.get("requesterRole"))
+            .and_then(|v| v.as_str());
+        if requester == Some(peer_role)
+            && sample.get("invalid").and_then(|v| v.as_bool()) == Some(true)
+        {
+            errors.push(LiveValidationError::InvalidClockProbe);
+            break;
+        }
+    }
+}
+
+fn validate_stats_samples(value: &Value, duration_ms: f64, errors: &mut Vec<LiveValidationError>) {
+    let duration_ms = duration_ms * 1000.0;
+    let samples = value
+        .get("statsSamples")
+        .or_else(|| value.get("stats_samples"))
+        .and_then(|v| v.as_array());
+    let Some(samples) = samples else {
+        return;
+    };
+    let mut prev: Option<f64> = None;
+    for sample in samples {
+        let offset = sample
+            .get("offsetMs")
+            .or_else(|| sample.get("offset_ms"))
+            .and_then(|v| v.as_f64());
+        let Some(offset) = offset else {
+            errors.push(LiveValidationError::StatsOffsetsNotMonotonic);
+            return;
+        };
+        if !offset.is_finite() {
+            errors.push(LiveValidationError::StatsOffsetsNotMonotonic);
+            return;
+        }
+        if let Some(prev_offset) = prev {
+            if offset <= prev_offset {
+                errors.push(LiveValidationError::StatsOffsetsNotMonotonic);
+                return;
+            }
+        }
+        if offset < 0.0 || offset > duration_ms {
+            errors.push(LiveValidationError::StatsOffsetsOutOfBounds);
+            return;
+        }
+        prev = Some(offset);
+    }
+}
+
+fn is_valid_correlation_id(corr: Option<&str>) -> bool {
+    match corr {
+        Some(id) if id.len() == 32 => id.chars().all(|c| c.is_ascii_hexdigit()),
+        _ => false,
     }
 }
 
@@ -254,9 +463,21 @@ fn counter_delta(first: &Value, last: &Value, path: &str) -> f64 {
 }
 
 fn metric_num(v: &Value) -> Option<f64> {
+    if let Ok(parsed) = serde_json::from_value::<LiveMetricValue>(v.clone()) {
+        return parsed.as_f64();
+    }
     v.get("value")
         .and_then(|v| v.as_f64())
         .or_else(|| v.as_f64())
+}
+
+impl LiveMetricValue {
+    fn as_f64(&self) -> Option<f64> {
+        match self {
+            LiveMetricValue::ObservedNumber { value } => Some(*value),
+            _ => None,
+        }
+    }
 }
 
 pub fn parse_and_validate_live_endpoint(
@@ -276,5 +497,98 @@ pub fn parse_and_validate_live_endpoint(
 }
 
 pub fn checksum_json(json: &str) -> String {
-    blake3::hash(json.as_bytes()).to_hex().to_string()
+    checksum_bytes(json.as_bytes())
+}
+
+pub fn checksum_bytes(data: &[u8]) -> String {
+    blake3::hash(data).to_hex().to_string()
+}
+
+pub fn verify_live_artifact_manifest(dir: &std::path::Path) -> LiveValidationResult {
+    let manifest_path = dir.join("artifact-manifest.json");
+    let manifest_json = match std::fs::read_to_string(&manifest_path) {
+        Ok(json) => json,
+        Err(e) => {
+            return LiveValidationResult::err(vec![LiveValidationError::ManifestVerification(
+                format!("missing artifact-manifest.json: {e}"),
+            )])
+        }
+    };
+
+    let manifest: Value = match serde_json::from_str(&manifest_json) {
+        Ok(v) => v,
+        Err(e) => {
+            return LiveValidationResult::err(vec![LiveValidationError::ManifestVerification(
+                e.to_string(),
+            )])
+        }
+    };
+
+    let schema = manifest.get("schemaVersion").and_then(|v| v.as_str());
+    if schema != Some(LIVE_MANIFEST_SCHEMA_VERSION) {
+        return LiveValidationResult::err(vec![LiveValidationError::ManifestSchemaMismatch(
+            schema.unwrap_or("missing").into(),
+        )]);
+    }
+
+    let algorithm = manifest.get("algorithm").and_then(|v| v.as_str());
+    if algorithm != Some(CHECKSUM_ALGORITHM) {
+        return LiveValidationResult::err(vec![LiveValidationError::ManifestVerification(
+            format!(
+                "unexpected checksum algorithm: {}",
+                algorithm.unwrap_or("missing")
+            ),
+        )]);
+    }
+
+    let artifacts = manifest.get("artifacts").and_then(|v| v.as_array());
+    let Some(artifacts) = artifacts else {
+        return LiveValidationResult::err(vec![LiveValidationError::ManifestVerification(
+            "missing artifacts array".into(),
+        )]);
+    };
+
+    let mut errors = Vec::new();
+    for entry in artifacts {
+        let filename = entry.get("filename").and_then(|v| v.as_str());
+        let expected = entry.get("checksum").and_then(|v| v.as_str());
+        let role = entry.get("artifactRole").and_then(|v| v.as_str());
+        let (Some(filename), Some(expected), Some(role)) = (filename, expected, role) else {
+            errors.push(LiveValidationError::ManifestVerification(
+                "manifest entry missing filename/checksum/artifactRole".into(),
+            ));
+            continue;
+        };
+
+        let path = dir.join(filename);
+        let bytes = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(e) => {
+                errors.push(LiveValidationError::ManifestVerification(format!(
+                    "{filename}: {e}"
+                )));
+                continue;
+            }
+        };
+        let actual = checksum_bytes(&bytes);
+        if actual != expected {
+            errors.push(LiveValidationError::ChecksumMismatch(filename.to_string()));
+        }
+
+        if role.ends_with("validated-peer-a") || role.ends_with("validated-peer-b") {
+            let json = String::from_utf8_lossy(&bytes);
+            let result = validate_live_endpoint(&json, true);
+            if !result.valid {
+                errors.extend(result.errors.into_iter().map(|e| {
+                    LiveValidationError::ManifestVerification(format!("{filename}: {e}"))
+                }));
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        LiveValidationResult::ok()
+    } else {
+        LiveValidationResult::err(errors)
+    }
 }

@@ -1,8 +1,14 @@
 use crate::live_derived::compute_live_endpoint_derived;
-use crate::live_schema::{LiveObservationPairV1, LIVE_PAIR_SCHEMA_VERSION};
+use crate::live_schema::{
+    LiveArtifactManifestEntryV1, LiveArtifactManifestV1, LiveObservationPairV1,
+    ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_A, ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_B,
+    ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_A, ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_B,
+    ARTIFACT_ROLE_PAIR_REPORT, ARTIFACT_ROLE_PAIR_SUMMARY, CHECKSUM_ALGORITHM,
+    LIVE_MANIFEST_SCHEMA_VERSION, LIVE_PAIR_SCHEMA_VERSION,
+};
 use crate::live_validate::{
-    checksum_json, parse_and_validate_live_endpoint, LiveValidationError, LiveValidationResult,
-    MIN_CLOCK_PROBES, MIN_STATS_SAMPLES,
+    checksum_bytes, count_valid_local_probes, parse_and_validate_live_endpoint,
+    verify_live_artifact_manifest, LiveValidationResult, MIN_CLOCK_PROBES, MIN_STATS_SAMPLES,
 };
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
@@ -14,6 +20,8 @@ pub enum PairValidationError {
     Endpoint(String),
     #[error("duplicate peer role")]
     DuplicateRole,
+    #[error("duplicate run id")]
+    DuplicateRunId,
     #[error("correlation id mismatch")]
     CorrelationMismatch,
     #[error("software commit mismatch")]
@@ -22,10 +30,14 @@ pub enum PairValidationError {
     SchemaMismatch,
     #[error("observation windows do not overlap")]
     NoOverlap,
+    #[error("endpoint not finalized")]
+    NotFinalized,
     #[error("insufficient stats samples on {0}")]
     InsufficientStats(String),
-    #[error("insufficient clock probes on {0}")]
+    #[error("insufficient valid local clock probes on {0}")]
     InsufficientClockProbes(String),
+    #[error("no bidirectional packet progression on {0}")]
+    NoPacketProgression(String),
     #[error("checksum mismatch for {0}")]
     ChecksumMismatch(String),
 }
@@ -43,7 +55,7 @@ pub struct PairArtifacts {
     pub peer_a_summary: Value,
     pub peer_b_summary: Value,
     pub report_markdown: String,
-    pub manifest: Value,
+    pub manifest: LiveArtifactManifestV1,
 }
 
 pub fn pair_live_endpoints(
@@ -81,6 +93,12 @@ pub fn pair_live_endpoints(
         errors.push(PairValidationError::DuplicateRole);
     }
 
+    let run_a = a_val.get("runId").and_then(|v| v.as_str());
+    let run_b = b_val.get("runId").and_then(|v| v.as_str());
+    if run_a.is_some() && run_a == run_b {
+        errors.push(PairValidationError::DuplicateRunId);
+    }
+
     let corr_a = a_val.get("sessionCorrelationId").and_then(|v| v.as_str());
     let corr_b = b_val.get("sessionCorrelationId").and_then(|v| v.as_str());
     if corr_a != corr_b {
@@ -91,6 +109,12 @@ pub fn pair_live_endpoints(
     let commit_b = b_val.get("softwareCommit").and_then(|v| v.as_str());
     if commit_a != commit_b {
         errors.push(PairValidationError::CommitMismatch);
+    }
+
+    for (_, val) in [("peer_a", &a_val), ("peer_b", &b_val)] {
+        if val.get("exportKind").and_then(|v| v.as_str()) != Some("finalized") {
+            errors.push(PairValidationError::NotFinalized);
+        }
     }
 
     let overlap = compute_overlap_seconds(&a_val, &b_val);
@@ -107,15 +131,14 @@ pub fn pair_live_endpoints(
         if stats < MIN_STATS_SAMPLES {
             errors.push(PairValidationError::InsufficientStats(label.to_string()));
         }
-        let probes = val
-            .pointer("/clockProbes/samples")
-            .and_then(|v| v.as_array())
-            .map(|a| a.len())
-            .unwrap_or(0);
+        let probes = count_valid_local_probes(val);
         if probes < MIN_CLOCK_PROBES {
             errors.push(PairValidationError::InsufficientClockProbes(
                 label.to_string(),
             ));
+        }
+        if !has_packet_progression(val) {
+            errors.push(PairValidationError::NoPacketProgression(label.to_string()));
         }
     }
 
@@ -129,9 +152,6 @@ pub fn pair_live_endpoints(
     let corr = corr_a.unwrap().to_string();
     let commit = commit_a.unwrap().to_string();
     let pair_id = format!("pair-{}", &corr[..16]);
-
-    let checksum_a = checksum_json(peer_a_json);
-    let checksum_b = checksum_json(peer_b_json);
 
     let peer_a_summary = compute_live_endpoint_derived(&a_val);
     let peer_b_summary = compute_live_endpoint_derived(&b_val);
@@ -172,31 +192,18 @@ pub fn pair_live_endpoints(
             "No measured one-way network latency.".into(),
             "No transport selection result.".into(),
         ],
-        artifact_checksums: json!({
-            "peerA": checksum_a,
-            "peerB": checksum_b,
-        }),
+        artifact_checksums: None,
     };
 
     let report = build_pair_report(&pair);
-    let manifest = json!({
-        "pairId": pair_id,
-        "sessionCorrelationId": corr,
-        "softwareCommit": commit,
-        "files": [
-            "peer-a.validated.json",
-            "peer-b.validated.json",
-            "peer-a.summary.json",
-            "peer-b.summary.json",
-            "pair-summary.json",
-            "report.md",
-            "artifact-manifest.json",
-        ],
-        "checksums": {
-            "peerA": checksum_a,
-            "peerB": checksum_b,
-        },
-    });
+    let manifest = LiveArtifactManifestV1 {
+        schema_version: LIVE_MANIFEST_SCHEMA_VERSION.to_string(),
+        algorithm: CHECKSUM_ALGORITHM.to_string(),
+        pair_id: pair_id.clone(),
+        session_correlation_id: corr.clone(),
+        software_commit: commit.clone(),
+        artifacts: vec![],
+    };
 
     Ok(PairArtifacts {
         pair,
@@ -207,6 +214,49 @@ pub fn pair_live_endpoints(
         report_markdown: report,
         manifest,
     })
+}
+
+pub fn build_manifest_entries(
+    dir: &std::path::Path,
+    pair_id: &str,
+    corr: &str,
+    commit: &str,
+) -> LiveArtifactManifestV1 {
+    let files = [
+        (
+            "peer-a.validated.json",
+            ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_A,
+        ),
+        (
+            "peer-b.validated.json",
+            ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_B,
+        ),
+        ("peer-a.summary.json", ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_A),
+        ("peer-b.summary.json", ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_B),
+        ("pair-summary.json", ARTIFACT_ROLE_PAIR_SUMMARY),
+        ("report.md", ARTIFACT_ROLE_PAIR_REPORT),
+    ];
+
+    let artifacts = files
+        .iter()
+        .map(|(filename, role)| {
+            let bytes = std::fs::read(dir.join(filename)).unwrap_or_default();
+            LiveArtifactManifestEntryV1 {
+                filename: (*filename).to_string(),
+                checksum: checksum_bytes(&bytes),
+                artifact_role: (*role).to_string(),
+            }
+        })
+        .collect();
+
+    LiveArtifactManifestV1 {
+        schema_version: LIVE_MANIFEST_SCHEMA_VERSION.to_string(),
+        algorithm: CHECKSUM_ALGORITHM.to_string(),
+        pair_id: pair_id.to_string(),
+        session_correlation_id: corr.to_string(),
+        software_commit: commit.to_string(),
+        artifacts,
+    }
 }
 
 fn compute_overlap_seconds(a: &Value, b: &Value) -> f64 {
@@ -227,6 +277,35 @@ fn parse_utc(v: Option<&Value>) -> Option<DateTime<Utc>> {
     v.and_then(|v| v.as_str())
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
         .map(|dt| dt.with_timezone(&Utc))
+}
+
+fn has_packet_progression(value: &Value) -> bool {
+    let samples = value.get("statsSamples").and_then(|v| v.as_array());
+    let Some(samples) = samples else {
+        return false;
+    };
+    if samples.len() < 2 {
+        return false;
+    }
+    let first = &samples[0];
+    let last = &samples[samples.len() - 1];
+    let inbound_delta = counter_delta(first, last, "/inboundAudio/packetsReceived");
+    let outbound_delta = counter_delta(first, last, "/outboundAudio/packetsSent");
+    inbound_delta > 0.0 && outbound_delta > 0.0
+}
+
+fn counter_delta(first: &Value, last: &Value, path: &str) -> f64 {
+    let a = first
+        .pointer(path)
+        .and_then(|v| v.get("value"))
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+    let b = last
+        .pointer(path)
+        .and_then(|v| v.get("value"))
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+    (b - a).max(0.0)
 }
 
 fn build_pair_report(pair: &LiveObservationPairV1) -> String {
@@ -254,35 +333,5 @@ Not a transport selection result.\n\n\
 }
 
 pub fn validate_live_directory(dir: &std::path::Path) -> LiveValidationResult {
-    let mut errors = Vec::new();
-    let mut count = 0;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("json") {
-                count += 1;
-                let json = std::fs::read_to_string(&path).unwrap_or_default();
-                let result = validate_live_endpoint_file(&json, false);
-                if !result.valid {
-                    errors.extend(result.errors.into_iter().map(|e| {
-                        LiveValidationError::InvalidJson(format!("{}: {e}", path.display()))
-                    }));
-                }
-            }
-        }
-    }
-    if count == 0 {
-        errors.push(LiveValidationError::MissingField(
-            "no json artifacts".into(),
-        ));
-    }
-    if errors.is_empty() {
-        LiveValidationResult::ok()
-    } else {
-        LiveValidationResult::err(errors)
-    }
-}
-
-fn validate_live_endpoint_file(json: &str, require_finalized: bool) -> LiveValidationResult {
-    crate::live_validate::validate_live_endpoint(json, require_finalized)
+    verify_live_artifact_manifest(dir)
 }

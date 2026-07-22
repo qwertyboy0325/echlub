@@ -1,4 +1,9 @@
-import { ClockProbeEngine, computeClockMedian, validCompletedProbes } from "./clock-probe";
+import {
+  ClockProbeEngine,
+  computeClockMedian,
+  validLocalCompletedProbes,
+} from "./clock-probe";
+import { collectStatsPreflight } from "./stats-sampler";
 import {
   applySignalingDescription,
   createAndSendOffer,
@@ -53,6 +58,12 @@ export class LiveWebRtcSession {
   private connectionLifecycle: Record<string, unknown> = {};
   private playoutState: Record<string, unknown> = {};
   private captureState: Record<string, unknown> = {};
+  private statsPreflightComplete = false;
+  private statsPreflightStarted = false;
+
+  private static readonly MIN_FINALIZED_STATS = 30;
+  private static readonly MIN_FINALIZED_PROBES = 10;
+  private static readonly COMMIT_SHA40 = /^[0-9a-fA-F]{40}$/;
 
   constructor(config: LiveSessionConfig, callbacks: LiveSessionCallbacks) {
     this.config = config;
@@ -190,8 +201,27 @@ export class LiveWebRtcSession {
       throw new Error("export before observation completion rejected");
     }
     const commit = this.config.softwareCommit?.trim();
-    if (!commit || commit === "unknown" || commit.length < 7) {
-      throw new Error("exact software commit required for finalized export");
+    if (!commit || !LiveWebRtcSession.COMMIT_SHA40.test(commit)) {
+      throw new Error("exact 40-character software commit required for finalized export");
+    }
+    if (!this.observationStartedAt || !this.observationCompletedAt) {
+      throw new Error("observation timestamps required for finalized export");
+    }
+    const startMs = Date.parse(this.observationStartedAt);
+    const endMs = Date.parse(this.observationCompletedAt);
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+      throw new Error("positive observation duration required for finalized export");
+    }
+    const durationSec = (endMs - startMs) / 1000;
+    if (durationSec <= 0 || durationSec > MAX_OBSERVATION_SECONDS) {
+      throw new Error("observation duration out of bounds for finalized export");
+    }
+    if (this.statsSamples.length < LiveWebRtcSession.MIN_FINALIZED_STATS) {
+      throw new Error("insufficient stats samples for finalized export");
+    }
+    const localProbes = validLocalCompletedProbes(this.clockSamples, this.config.localPeerId);
+    if (localProbes.length < LiveWebRtcSession.MIN_FINALIZED_PROBES) {
+      throw new Error("insufficient valid local clock probes for finalized export");
     }
     return this.buildEndpointExport(true);
   }
@@ -215,15 +245,15 @@ export class LiveWebRtcSession {
         browserFamily: detectBrowserFamily(),
         platform: navigator.platform ?? null,
         secureContext: window.isSecureContext,
-        crossOriginIsolated: crossOriginIsolated,
+        crossOriginIsolated: globalThis.crossOriginIsolated ?? false,
         locale: navigator.language,
       },
       capture: this.captureState,
       playout: {
         path: "html_media_element",
         remoteAudioTrackReceived: this.remoteStream !== null,
-        remoteAudioTrackReadyState: remoteTrack?.readyState ?? unavailable("no remote track").reason,
-        remoteAudioTrackMuted: remoteTrack?.muted ?? unavailable("no remote track").reason,
+        remoteAudioTrackReadyState: remoteTrack?.readyState ?? null,
+        remoteAudioTrackMuted: remoteTrack?.muted ?? null,
         autoplayAttempted: true,
         ...this.playoutState,
       },
@@ -234,7 +264,7 @@ export class LiveWebRtcSession {
       },
       clockProbes: {
         samples: this.clockSamples,
-        completedProbes: validCompletedProbes(this.clockSamples).length,
+        completedProbes: validLocalCompletedProbes(this.clockSamples, this.config.localPeerId).length,
         medianRttMs: medians.rtt,
         medianOffsetMs: medians.offset,
         madRttMs: medians.madRtt,
@@ -398,6 +428,7 @@ export class LiveWebRtcSession {
   }
 
   private evaluateReadyToObserve(): void {
+    this.ensureStatsPreflight();
     try {
       this.collectReadyFailures();
       if (this.phase !== "observing" && this.phase !== "completed" && this.phase !== "finalizing") {
@@ -406,6 +437,27 @@ export class LiveWebRtcSession {
     } catch {
       /* not ready yet */
     }
+  }
+
+  private ensureStatsPreflight(): void {
+    if (this.statsPreflightComplete || this.statsPreflightStarted || !this.pc) return;
+    if (this.pc.connectionState !== "connected") return;
+    if (this.dc?.readyState !== "open") return;
+    this.statsPreflightStarted = true;
+    void collectStatsPreflight(this.pc)
+      .then((sample) => {
+        if (!this.statsPreflightComplete) {
+          this.statsPreflightComplete = true;
+          this.statsSamples.push(sample);
+          this.callbacks.onStatsSample(sample);
+        }
+      })
+      .catch(() => {
+        this.statsPreflightStarted = false;
+      })
+      .finally(() => {
+        this.evaluateReadyToObserve();
+      });
   }
 
   private assertReadyToObserve(): void {
@@ -431,13 +483,11 @@ export class LiveWebRtcSession {
       failures.push("remote audio track missing or ended");
     }
     if (this.dc?.readyState !== "open") failures.push("data channel not open");
-    const completedProbes = validCompletedProbes(this.clockSamples);
-    if (completedProbes.length < 1) failures.push("clock preflight incomplete");
-    if (this.statsSamples.length < 1 && this.phase === "ready_to_observe") {
-      /* stats preflight runs during observation */
-    }
+    const localProbes = validLocalCompletedProbes(this.clockSamples, this.config.localPeerId);
+    if (localProbes.length < 1) failures.push("clock preflight incomplete");
+    if (!this.statsPreflightComplete) failures.push("stats preflight incomplete");
     const commit = this.config.softwareCommit?.trim();
-    if (!commit || commit === "unknown" || commit.length < 7) {
+    if (!commit || !LiveWebRtcSession.COMMIT_SHA40.test(commit)) {
       failures.push("exact software commit missing");
     }
     return failures;
