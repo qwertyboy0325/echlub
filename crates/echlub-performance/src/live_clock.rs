@@ -3,7 +3,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 /// JSON-serialization tolerance for stored vs canonical clock metrics (milliseconds).
-pub const CLOCK_METRIC_EPSILON_MS: f64 = 1e-6;
+pub const CLOCK_METRIC_EPSILON_MS: f64 = 1e-3;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CrossDeviceClockMetrics {

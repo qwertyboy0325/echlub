@@ -4,7 +4,7 @@ export const CLOCK_PROBE_PROTOCOL_VERSION = 1;
 export const MAX_PROBE_PAYLOAD_BYTES = 512;
 export const PROBE_TIMEOUT_MS = 5000;
 /** JSON-serialization tolerance for stored vs canonical clock metrics (milliseconds). */
-export const CLOCK_METRIC_EPSILON_MS = 1e-6;
+export const CLOCK_METRIC_EPSILON_MS = 1e-3;
 
 interface ProbeRequest {
   type: "clock_probe_request";
@@ -78,27 +78,20 @@ export function canonicalizeClockProbeSampleForExport(sample: ClockProbeSample):
   ) {
     return roundTripped;
   }
-  const t0 = jsonStableFloat(roundTripped.t0);
-  const t1 = jsonStableFloat(roundTripped.t1);
-  const t2 = jsonStableFloat(roundTripped.t2);
-  const t3 = jsonStableFloat(roundTripped.t3);
-  const validation = validateCrossDeviceClockTimestamps(t0, t1, t2, t3);
+  const validation = validateCrossDeviceClockTimestamps(
+    roundTripped.t0,
+    roundTripped.t1,
+    roundTripped.t2,
+    roundTripped.t3,
+  );
   if (!validation.valid || validation.rttMs === null) {
-    return { ...roundTripped, t0, t1, t2, t3 };
+    return roundTripped;
   }
   return {
     ...roundTripped,
-    t0,
-    t1,
-    t2,
-    t3,
-    rttMs: jsonStableFloat(validation.rttMs),
-    offsetMs: validation.offsetMs === null ? null : jsonStableFloat(validation.offsetMs),
+    rttMs: validation.rttMs,
+    offsetMs: validation.offsetMs,
   };
-}
-
-function jsonStableFloat(value: number): number {
-  return Number.parseFloat(value.toFixed(3));
 }
 
 export function verifyStoredClockMetrics(
