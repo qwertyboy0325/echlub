@@ -328,8 +328,12 @@ export class LiveWebRtcSession {
       }
     };
     pc.ontrack = (event) => {
-      this.remoteStream = event.streams[0] ?? null;
-      this.callbacks.onRemoteStream(this.remoteStream!);
+      this.remoteStream =
+        event.streams[0] ??
+        (event.track ? new MediaStream([event.track]) : remoteAudioStreamFromReceivers(pc));
+      if (this.remoteStream) {
+        this.callbacks.onRemoteStream(this.remoteStream);
+      }
       this.evaluateReadyToObserve();
     };
     pc.onicecandidate = (event) => {
@@ -446,6 +450,13 @@ export class LiveWebRtcSession {
 
   private evaluateReadyToObserve(): void {
     this.ensureStatsPreflight();
+    if (!this.remoteStream && this.pc) {
+      const receiverStream = remoteAudioStreamFromReceivers(this.pc);
+      if (receiverStream) {
+        this.remoteStream = receiverStream;
+        this.callbacks.onRemoteStream(receiverStream);
+      }
+    }
     const failures = this.collectReadyFailures();
     if (
       failures.length === 0 &&
@@ -528,6 +539,14 @@ function detectBrowserFamily(): string | null {
   if (ua.includes("Firefox")) return "firefox";
   if (ua.includes("Safari")) return "safari";
   return null;
+}
+
+function remoteAudioStreamFromReceivers(pc: RTCPeerConnection): MediaStream | null {
+  const tracks = pc
+    .getReceivers()
+    .map((receiver) => receiver.track)
+    .filter((track): track is MediaStreamTrack => track?.kind === "audio");
+  return tracks.length > 0 ? new MediaStream(tracks) : null;
 }
 
 export type { LiveSessionConfig, LiveSessionCallbacks, PeerRole, CaptureProfile, ObservationConfig };
