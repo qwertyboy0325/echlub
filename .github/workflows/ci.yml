@@ -31,6 +31,8 @@ jobs:
         run: corepack pnpm performance:test
       - name: Live tests
         run: corepack pnpm live:test
+      - name: Live dual-browser harness unit tests
+        run: corepack pnpm --filter @echlub/live-dual-browser-harness test
       - name: Live draft endpoint vector validation
         run: cargo run -p echlub-performance-report -- validate-live-draft test-vectors/performance/live-endpoint-peer-a-v1.json
       - name: Live finalized positive fixture

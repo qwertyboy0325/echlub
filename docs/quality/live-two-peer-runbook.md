@@ -2,6 +2,18 @@
 
 > **Status: SUSPENDED** pending owner external review before manual two-device observation. Automated correction packages harden harness, validators, and setup flow; live endpoint evidence still requires owner run per stop gate `OWNER_LIVE_RUN_REQUIRED`.
 
+## Optional readiness preflight (single host)
+
+Before attempting a physical two-device run, you may execute the automated single-host dual-browser harness:
+
+```bash
+corepack pnpm install
+corepack pnpm exec playwright install chromium
+corepack pnpm live:e2e:single-host
+```
+
+See `docs/quality/single-host-dual-browser-automation.md`. A local **PASS** means the supported browser flow completed automatically on one machine only. It is **not** physical two-device evidence and does not satisfy `OWNER_LIVE_RUN_REQUIRED`.
+
 ## Host device
 
 ```bash

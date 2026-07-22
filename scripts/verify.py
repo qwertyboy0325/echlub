@@ -188,6 +188,16 @@ def main() -> int:
                 ],
             ),
             (
+                "live dual-browser harness unit tests",
+                [
+                    "corepack",
+                    "pnpm",
+                    "--filter",
+                    "@echlub/live-dual-browser-harness",
+                    "test",
+                ],
+            ),
+            (
                 "live cross-clock +500 fixture",
                 [
                     "cargo",
