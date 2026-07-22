@@ -4,7 +4,7 @@ import {
   computeClockMedian,
   validLocalCompletedProbes,
 } from "./clock-probe";
-import { collectStatsPreflight } from "./stats-sampler";
+import { collectStatsPreflight, hasRtpAudioCounterAvailability } from "./stats-sampler";
 import {
   applySignalingDescription,
   createAndSendOffer,
@@ -61,6 +61,7 @@ export class LiveWebRtcSession {
   private captureState: Record<string, unknown> = {};
   private statsPreflightComplete = false;
   private statsPreflightStarted = false;
+  private statsPreflightHasRtpAudio = false;
   private peerNegotiationStarted = false;
 
   private static readonly MIN_FINALIZED_STATS = 30;
@@ -256,7 +257,7 @@ export class LiveWebRtcSession {
         path: "html_media_element",
         remoteAudioTrackReceived: this.remoteStream !== null,
         remoteAudioTrackReadyState: remoteTrack?.readyState ?? null,
-        remoteAudioTrackMuted: remoteTrack?.muted ?? null,
+        remoteAudioTrackUnmuted: remoteTrack ? !remoteTrack.muted : null,
         autoplayAttempted: true,
         ...this.playoutState,
       },
@@ -333,9 +334,7 @@ export class LiveWebRtcSession {
     };
     pc.onnegotiationneeded = () => {
       this.callbacks.onNegotiation("negotiation_needed");
-      if (this.config.localPeerId === "peer_a") {
-        void this.startNegotiation();
-      }
+      this.maybeStartInitialNegotiation("negotiation_needed");
     };
     pc.ontrack = (event) => {
       this.remoteStream =
@@ -443,10 +442,32 @@ export class LiveWebRtcSession {
     }
     this.peerPresent = true;
     this.setPhase("peer_present");
-    if (this.config.localPeerId === "peer_a" && !this.peerNegotiationStarted) {
-      this.peerNegotiationStarted = true;
-      void this.startNegotiation();
-    }
+    this.maybeStartInitialNegotiation("peer_joined");
+  }
+
+  private maybeStartInitialNegotiation(
+    trigger: "negotiation_needed" | "peer_joined",
+  ): void {
+    if (this.config.localPeerId !== "peer_a") return;
+    if (!this.pc) return;
+    if (!this.peerPresent) return;
+    if (this.peerNegotiationStarted) return;
+    if (this.negotiation.makingOffer) return;
+    if (this.pc.signalingState !== "stable") return;
+    if (this.stopped) return;
+
+    this.peerNegotiationStarted = true;
+    void this.startNegotiation().catch((error) => {
+      if (
+        !this.stopped &&
+        this.pc?.signalingState === "stable" &&
+        !this.negotiation.makingOffer
+      ) {
+        this.peerNegotiationStarted = false;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      this.callbacks.onError(`initial negotiation failed (${trigger}): ${message}`);
+    });
   }
 
   private async startNegotiation(): Promise<void> {
@@ -488,6 +509,7 @@ export class LiveWebRtcSession {
       .then((sample) => {
         if (!this.statsPreflightComplete) {
           this.statsPreflightComplete = true;
+          this.statsPreflightHasRtpAudio = hasRtpAudioCounterAvailability(sample);
           this.statsSamples.push(sample);
           this.callbacks.onStatsSample(sample);
         }
@@ -526,6 +548,9 @@ export class LiveWebRtcSession {
     const localProbes = validLocalCompletedProbes(this.clockSamples, this.config.localPeerId);
     if (localProbes.length < 1) failures.push("clock preflight incomplete");
     if (!this.statsPreflightComplete) failures.push("stats preflight incomplete");
+    if (this.statsPreflightComplete && !this.statsPreflightHasRtpAudio) {
+      failures.push("genuine RTP audio stats unavailable");
+    }
     const commit = this.config.softwareCommit?.trim();
     if (!commit || !LiveWebRtcSession.COMMIT_SHA40.test(commit)) {
       failures.push("exact software commit missing");

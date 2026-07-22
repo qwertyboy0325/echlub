@@ -6,7 +6,15 @@ Harden live WebRTC laboratory for two-peer LAN observations with validated endpo
 
 Implementation branch: `work/live-two-peer-observation-01`
 
-Stop gate without owner manual run: `OWNER_LIVE_RUN_REQUIRED`
+Stop gate without owner manual run: `OWNER_LIVE_RUN_REQUIRED` (physical evidence only; not required for draft PR merge review)
+
+```yaml
+physical_two_device_test:
+  status: deferred
+  required_for_this_merge: false
+  evidence_claimed: false
+  future_gate: separate owner-authorized evidence run
+```
 
 ## Scope
 

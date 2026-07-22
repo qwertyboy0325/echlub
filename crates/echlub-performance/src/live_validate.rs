@@ -81,6 +81,12 @@ pub enum LiveValidationError {
     RemoteAudioNotLive,
     #[error("no packet progression")]
     NoPacketProgression,
+    #[error("no inbound RTP audio progression")]
+    NoInboundRtpAudioProgression,
+    #[error("no outbound RTP audio progression")]
+    NoOutboundRtpAudioProgression,
+    #[error("invalid audio counter provenance")]
+    InvalidAudioCounterProvenance,
     #[error("manifest schema mismatch: {0}")]
     ManifestSchemaMismatch(String),
     #[error("checksum mismatch for {0}")]
@@ -330,8 +336,12 @@ fn validate_finalized_requirements(value: &Value, errors: &mut Vec<LiveValidatio
         errors.push(LiveValidationError::RemoteAudioNotLive);
     }
 
-    if !has_packet_progression(value) {
-        errors.push(LiveValidationError::NoPacketProgression);
+    validate_audio_counter_provenance(value, errors);
+    if !has_inbound_rtp_audio_progression(value) {
+        errors.push(LiveValidationError::NoInboundRtpAudioProgression);
+    }
+    if !has_outbound_rtp_audio_progression(value) {
+        errors.push(LiveValidationError::NoOutboundRtpAudioProgression);
     }
 }
 
@@ -449,7 +459,49 @@ fn parse_utc(v: Option<&Value>) -> Option<DateTime<Utc>> {
         .map(|dt| dt.with_timezone(&Utc))
 }
 
-fn has_packet_progression(value: &Value) -> bool {
+pub const RTP_AUDIO_COUNTER_SOURCE: &str = "rtp_audio";
+
+fn validate_audio_counter_provenance(value: &Value, errors: &mut Vec<LiveValidationError>) {
+    let samples = value
+        .get("statsSamples")
+        .or_else(|| value.get("stats_samples"))
+        .and_then(|v| v.as_array());
+    let Some(samples) = samples else {
+        return;
+    };
+    for sample in samples {
+        for key in ["inboundAudio", "outboundAudio"] {
+            let Some(audio) = sample.get(key) else {
+                continue;
+            };
+            if audio.as_object().is_none_or(|o| o.is_empty()) {
+                continue;
+            }
+            let source = audio
+                .get("counterSource")
+                .and_then(|v| v.get("value"))
+                .and_then(|v| v.as_str());
+            if source != Some(RTP_AUDIO_COUNTER_SOURCE) {
+                errors.push(LiveValidationError::InvalidAudioCounterProvenance);
+                return;
+            }
+        }
+    }
+}
+
+pub fn has_inbound_rtp_audio_progression(value: &Value) -> bool {
+    has_direction_rtp_audio_progression(value, "inboundAudio", "/inboundAudio/packetsReceived")
+}
+
+pub fn has_outbound_rtp_audio_progression(value: &Value) -> bool {
+    has_direction_rtp_audio_progression(value, "outboundAudio", "/outboundAudio/packetsSent")
+}
+
+pub fn has_rtp_audio_packet_progression(value: &Value) -> bool {
+    has_inbound_rtp_audio_progression(value) && has_outbound_rtp_audio_progression(value)
+}
+
+fn has_direction_rtp_audio_progression(value: &Value, audio_key: &str, packet_path: &str) -> bool {
     let samples = value
         .get("statsSamples")
         .or_else(|| value.get("stats_samples"))
@@ -460,11 +512,24 @@ fn has_packet_progression(value: &Value) -> bool {
     if samples.len() < 2 {
         return false;
     }
-    let first = &samples[0];
-    let last = &samples[samples.len() - 1];
-    let inbound_delta = counter_delta(first, last, "/inboundAudio/packetsReceived");
-    let outbound_delta = counter_delta(first, last, "/outboundAudio/packetsSent");
-    inbound_delta > 0.0 && outbound_delta > 0.0
+    let valid: Vec<&Value> = samples
+        .iter()
+        .filter(|sample| has_rtp_audio_provenance(sample, audio_key))
+        .filter(|sample| sample.pointer(packet_path).and_then(metric_num).is_some())
+        .collect();
+    if valid.len() < 2 {
+        return false;
+    }
+    counter_delta(valid[0], valid[valid.len() - 1], packet_path) > 0.0
+}
+
+fn has_rtp_audio_provenance(sample: &Value, audio_key: &str) -> bool {
+    sample
+        .get(audio_key)
+        .and_then(|audio| audio.get("counterSource"))
+        .and_then(|source| source.get("value"))
+        .and_then(|value| value.as_str())
+        == Some(RTP_AUDIO_COUNTER_SOURCE)
 }
 
 fn counter_delta(first: &Value, last: &Value, path: &str) -> f64 {

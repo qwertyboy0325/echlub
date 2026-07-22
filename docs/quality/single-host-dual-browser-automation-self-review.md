@@ -39,4 +39,10 @@ This review confirms implementation intent against the work package. It does **n
 
 ## Local E2E evidence
 
-Local headed run at commit `9d7361262d51945956bf19f7f624b386725eb020` produced `automation-report.json` with `result: PASS` for both connect-order scenarios. CI runs harness unit tests only (no headed E2E).
+Pre-correction headed run at commit `4ad830f9556c9ec1d74db3eb79fcd373559af005` produced:
+
+- automation report SHA-256: `6100f367f9be4690ee1eab0ac272103f983ba24a0042bb8efce263d7459d74d7`
+- peer-a-first manifest SHA-256: `5631ed7fa08ecbb4e493b6ca880cd2be786d61dea87706437aff55e0dbe94586`
+- peer-b-first manifest SHA-256: `131a2d9f62ccce86c25437e3b0ccf87062cdeba443d154be781fc064eaf0f6fc`
+
+Final-head headed runs after F10 correction update this pointer to the post-correction commit and checksums recorded in `docs/quality/final-conflict-resolution-correction-10-self-review.md`. CI runs harness unit tests only (no headed E2E).

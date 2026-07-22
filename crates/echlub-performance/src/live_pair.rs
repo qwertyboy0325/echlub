@@ -5,8 +5,9 @@ use crate::live_schema::{
     LIVE_PAIR_SCHEMA_VERSION,
 };
 use crate::live_validate::{
-    checksum_bytes, count_valid_local_probes, parse_and_validate_live_endpoint,
-    verify_live_artifact_manifest, LiveValidationResult, MIN_CLOCK_PROBES, MIN_STATS_SAMPLES,
+    checksum_bytes, count_valid_local_probes, has_rtp_audio_packet_progression,
+    parse_and_validate_live_endpoint, verify_live_artifact_manifest, LiveValidationError,
+    LiveValidationResult, MIN_CLOCK_PROBES, MIN_STATS_SAMPLES,
 };
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
@@ -135,7 +136,7 @@ pub fn pair_live_endpoints(
                 label.to_string(),
             ));
         }
-        if !has_packet_progression(val) {
+        if !has_rtp_audio_packet_progression(val) {
             errors.push(PairValidationError::NoPacketProgression(label.to_string()));
         }
     }
@@ -276,33 +277,113 @@ fn parse_utc(v: Option<&Value>) -> Option<DateTime<Utc>> {
         .map(|dt| dt.with_timezone(&Utc))
 }
 
-fn has_packet_progression(value: &Value) -> bool {
-    let samples = value.get("statsSamples").and_then(|v| v.as_array());
-    let Some(samples) = samples else {
-        return false;
-    };
-    if samples.len() < 2 {
-        return false;
-    }
-    let first = &samples[0];
-    let last = &samples[samples.len() - 1];
-    let inbound_delta = counter_delta(first, last, "/inboundAudio/packetsReceived");
-    let outbound_delta = counter_delta(first, last, "/outboundAudio/packetsSent");
-    inbound_delta > 0.0 && outbound_delta > 0.0
+fn json_semantic_equal(actual: &Value, expected: &Value) -> bool {
+    actual == expected
 }
 
-fn counter_delta(first: &Value, last: &Value, path: &str) -> f64 {
-    let a = first
-        .pointer(path)
-        .and_then(|v| v.get("value"))
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0);
-    let b = last
-        .pointer(path)
-        .and_then(|v| v.get("value"))
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0);
-    (b - a).max(0.0)
+fn verify_live_directory_semantics(dir: &std::path::Path) -> LiveValidationResult {
+    let mut errors = Vec::new();
+
+    let read_required = |filename: &str| -> Result<String, LiveValidationError> {
+        std::fs::read_to_string(dir.join(filename))
+            .map_err(|e| LiveValidationError::ManifestVerification(format!("{filename}: {e}")))
+    };
+
+    let peer_a_json = match read_required("peer-a.validated.json") {
+        Ok(json) => json,
+        Err(err) => return LiveValidationResult::err(vec![err]),
+    };
+    let peer_b_json = match read_required("peer-b.validated.json") {
+        Ok(json) => json,
+        Err(err) => return LiveValidationResult::err(vec![err]),
+    };
+
+    let expected = match pair_live_endpoints(&peer_a_json, &peer_b_json) {
+        Ok(artifacts) => artifacts,
+        Err(result) => {
+            return LiveValidationResult::err(
+                result
+                    .errors
+                    .into_iter()
+                    .map(|e| LiveValidationError::ManifestVerification(format!("pairing: {e}")))
+                    .collect(),
+            )
+        }
+    };
+
+    let compare_json_file =
+        |filename: &str, expected_value: &Value, errors: &mut Vec<LiveValidationError>| {
+            match read_required(filename) {
+                Ok(json) => match serde_json::from_str::<Value>(&json) {
+                    Ok(actual) => {
+                        if !json_semantic_equal(&actual, expected_value) {
+                            errors.push(LiveValidationError::ManifestVerification(format!(
+                                "{filename}: semantic mismatch with recomputed artifact"
+                            )));
+                        }
+                    }
+                    Err(e) => errors.push(LiveValidationError::ManifestVerification(format!(
+                        "{filename}: invalid JSON: {e}"
+                    ))),
+                },
+                Err(err) => errors.push(err),
+            }
+        };
+
+    compare_json_file("peer-a.summary.json", &expected.peer_a_summary, &mut errors);
+    compare_json_file("peer-b.summary.json", &expected.peer_b_summary, &mut errors);
+
+    let expected_pair = serde_json::to_value(&expected.pair).unwrap_or(Value::Null);
+    compare_json_file("pair-summary.json", &expected_pair, &mut errors);
+
+    match read_required("report.md") {
+        Ok(actual_report) => {
+            if actual_report != expected.report_markdown {
+                errors.push(LiveValidationError::ManifestVerification(
+                    "report.md: semantic mismatch with recomputed report".into(),
+                ));
+            }
+        }
+        Err(err) => errors.push(err),
+    }
+
+    let manifest_json = match read_required("artifact-manifest.json") {
+        Ok(json) => json,
+        Err(err) => return LiveValidationResult::err(vec![err]),
+    };
+    let manifest: Value = match serde_json::from_str(&manifest_json) {
+        Ok(value) => value,
+        Err(e) => {
+            return LiveValidationResult::err(vec![LiveValidationError::ManifestVerification(
+                e.to_string(),
+            )])
+        }
+    };
+
+    let identity_checks = [
+        ("pairId", expected.pair.pair_id.clone()),
+        (
+            "sessionCorrelationId",
+            expected.pair.session_correlation_id.clone(),
+        ),
+        ("softwareCommit", expected.pair.software_commit.clone()),
+        ("schemaVersion", LIVE_MANIFEST_SCHEMA_VERSION.to_string()),
+        ("algorithm", CHECKSUM_ALGORITHM.to_string()),
+    ];
+    for (field, expected_value) in identity_checks {
+        let actual = manifest.get(field).and_then(|v| v.as_str());
+        if actual != Some(expected_value.as_str()) {
+            errors.push(LiveValidationError::ManifestVerification(format!(
+                "artifact-manifest.json: {field} mismatch with recomputed pair"
+            )));
+        }
+    }
+
+    if errors.is_empty() {
+        LiveValidationResult::ok()
+    } else {
+        LiveValidationResult::err(errors)
+    }
 }
 
 fn build_pair_report(pair: &LiveObservationPairV1) -> String {
@@ -330,5 +411,9 @@ Not a transport selection result.\n\n\
 }
 
 pub fn validate_live_directory(dir: &std::path::Path) -> LiveValidationResult {
-    verify_live_artifact_manifest(dir)
+    let checksum_result = verify_live_artifact_manifest(dir);
+    if !checksum_result.valid {
+        return checksum_result;
+    }
+    verify_live_directory_semantics(dir)
 }

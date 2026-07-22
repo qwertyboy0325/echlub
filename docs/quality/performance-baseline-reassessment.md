@@ -30,4 +30,13 @@ Each run directory must pass both `validate` and `assess-synthetic`.
 
 ## Status
 
-Corrected synthetic run `synthetic-2026-07-21T10-01-14-749008Z` passes validate + assess-synthetic. See `evidence/performance-baseline/manifest.json`.
+> **Historical / superseded — not active observation authority.**
+> The corrected synthetic run `synthetic-2026-07-21T10-01-14-749008Z` previously recorded as passing validate + assess-synthetic is retained for traceability only. It is not the active observation authority for live two-peer evidence.
+
+```yaml
+latestSyntheticOutcome: HARNESS_LIMITATION
+decodedPulses: 0/5
+activeCorrectedObservation: none
+```
+
+Corrected synthetic observations remain under `evidence/performance-baseline/corrected/<run-id>/` when regenerated, but no synthetic PASS currently authorizes live merge evidence.

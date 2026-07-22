@@ -1,9 +1,12 @@
 import {
+  CANDIDATE_PAIR_TRANSPORT_COUNTER_SOURCE,
   invalid,
+  isObservedCategory,
   isObservedNumber,
   observedBoolean,
   observedCategory,
   observedNumber,
+  RTP_AUDIO_COUNTER_SOURCE,
   unsupported,
   unavailable,
   type MetricValue,
@@ -76,6 +79,64 @@ function sanitizeCodecMime(report: Record<string, unknown>): MetricValue {
   return unsupported();
 }
 
+function isGenuineAudioRtpReport(
+  report: Record<string, unknown>,
+  reports: Map<string, Record<string, unknown>>,
+  direction: "inbound" | "outbound",
+): boolean {
+  const expectedType = direction === "inbound" ? "inbound-rtp" : "outbound-rtp";
+  if (report.type !== expectedType) {
+    return false;
+  }
+  if (report.kind === "audio") {
+    return true;
+  }
+  if (report.mediaType === "audio") {
+    return true;
+  }
+  const codecId = report.codecId;
+  if (codecId !== undefined && codecId !== null) {
+    const codec = reports.get(String(codecId));
+    if (codec && typeof codec.mimeType === "string" && codec.mimeType.startsWith("audio/")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildRtpAudioInbound(report: Record<string, unknown>): Record<string, MetricValue> {
+  return {
+    counterSource: observedCategory(RTP_AUDIO_COUNTER_SOURCE),
+    packetsReceived: metricNumberFromReport(report, "packetsReceived"),
+    packetsLost: metricNumberFromReport(report, "packetsLost"),
+    jitter: metricNumberFromReport(report, "jitter"),
+    jitterBufferDelay: metricNumberFromReport(report, "jitterBufferDelay"),
+    jitterBufferTargetDelay: metricNumberFromReport(report, "jitterBufferTargetDelay"),
+    jitterBufferMinimumDelay: metricNumberFromReport(report, "jitterBufferMinimumDelay"),
+    bytesReceived: metricNumberFromReport(report, "bytesReceived"),
+    concealedSamples: metricNumberFromReport(report, "concealedSamples"),
+    totalSamplesReceived: metricNumberFromReport(report, "totalSamplesReceived"),
+    audioLevel: metricNumberFromReport(report, "audioLevel"),
+  };
+}
+
+function buildRtpAudioOutbound(report: Record<string, unknown>): Record<string, MetricValue> {
+  return {
+    counterSource: observedCategory(RTP_AUDIO_COUNTER_SOURCE),
+    packetsSent: metricNumberFromReport(report, "packetsSent"),
+    bytesSent: metricNumberFromReport(report, "bytesSent"),
+    retransmittedPacketsSent: metricNumberFromReport(report, "retransmittedPacketsSent"),
+    audioLevel: metricNumberFromReport(report, "audioLevel"),
+  };
+}
+
+export function hasRtpAudioCounterAvailability(sample: NormalizedStatsSample): boolean {
+  return (
+    isObservedCategory(sample.inboundAudio.counterSource, RTP_AUDIO_COUNTER_SOURCE) &&
+    isObservedCategory(sample.outboundAudio.counterSource, RTP_AUDIO_COUNTER_SOURCE)
+  );
+}
+
 export async function collectNormalizedStats(
   pc: RTCPeerConnection,
   offsetMs: number,
@@ -99,6 +160,7 @@ export async function collectNormalizedStats(
       if (pairId && reports.has(pairId)) {
         const pair = reports.get(pairId)!;
         candidatePair = {
+          counterSource: observedCategory(CANDIDATE_PAIR_TRANSPORT_COUNTER_SOURCE),
           state: sanitizeConnectionState(pair),
           nominated: metricBooleanFromReport(pair, "nominated"),
           protocol: sanitizeProtocol(pair),
@@ -116,27 +178,11 @@ export async function collectNormalizedStats(
         };
       }
     }
-    if (report.type === "inbound-rtp" && report.kind === "audio") {
-      inboundAudio = {
-        packetsReceived: metricNumberFromReport(report, "packetsReceived"),
-        packetsLost: metricNumberFromReport(report, "packetsLost"),
-        jitter: metricNumberFromReport(report, "jitter"),
-        jitterBufferDelay: metricNumberFromReport(report, "jitterBufferDelay"),
-        jitterBufferTargetDelay: metricNumberFromReport(report, "jitterBufferTargetDelay"),
-        jitterBufferMinimumDelay: metricNumberFromReport(report, "jitterBufferMinimumDelay"),
-        bytesReceived: metricNumberFromReport(report, "bytesReceived"),
-        concealedSamples: metricNumberFromReport(report, "concealedSamples"),
-        totalSamplesReceived: metricNumberFromReport(report, "totalSamplesReceived"),
-        audioLevel: metricNumberFromReport(report, "audioLevel"),
-      };
+    if (isGenuineAudioRtpReport(report, reports, "inbound")) {
+      inboundAudio = buildRtpAudioInbound(report);
     }
-    if (report.type === "outbound-rtp" && report.kind === "audio") {
-      outboundAudio = {
-        packetsSent: metricNumberFromReport(report, "packetsSent"),
-        bytesSent: metricNumberFromReport(report, "bytesSent"),
-        retransmittedPacketsSent: metricNumberFromReport(report, "retransmittedPacketsSent"),
-        audioLevel: metricNumberFromReport(report, "audioLevel"),
-      };
+    if (isGenuineAudioRtpReport(report, reports, "outbound")) {
+      outboundAudio = buildRtpAudioOutbound(report);
     }
     if (report.type === "remote-inbound-rtp" && report.kind === "audio") {
       remoteInboundAudio = {
@@ -155,8 +201,6 @@ export async function collectNormalizedStats(
     }
   }
 
-  applyCandidatePairAudioFallback(inboundAudio, outboundAudio, candidatePair);
-
   const sample: NormalizedStatsSample = {
     offsetMs,
     candidatePair,
@@ -173,39 +217,27 @@ export async function collectNormalizedStats(
   return sample;
 }
 
-export function applyCandidatePairAudioFallback(
-  inboundAudio: Record<string, MetricValue>,
-  outboundAudio: Record<string, MetricValue>,
-  candidatePair: Record<string, MetricValue>,
-): void {
-  if (!("packetsReceived" in inboundAudio) && candidatePair.packetsReceived) {
-    Object.assign(inboundAudio, {
-      packetsReceived: candidatePair.packetsReceived,
-      bytesReceived: candidatePair.bytesReceived ?? unsupported(),
-      packetsLost: unsupported(),
-      jitter: unsupported(),
-      jitterBufferDelay: unsupported(),
-      jitterBufferTargetDelay: unsupported(),
-      jitterBufferMinimumDelay: unsupported(),
-      concealedSamples: unsupported(),
-      totalSamplesReceived: unsupported(),
-      audioLevel: unsupported(),
-    });
-  }
-  if (!("packetsSent" in outboundAudio) && candidatePair.packetsSent) {
-    Object.assign(outboundAudio, {
-      packetsSent: candidatePair.packetsSent,
-      bytesSent: candidatePair.bytesSent ?? unsupported(),
-      retransmittedPacketsSent: unsupported(),
-      audioLevel: unsupported(),
-    });
-  }
-}
-
 export async function collectStatsPreflight(
   pc: RTCPeerConnection,
 ): Promise<NormalizedStatsSample> {
   return collectNormalizedStats(pc, 0, null);
+}
+
+function audioByteMetric(
+  audio: Record<string, MetricValue>,
+  key: "bytesReceived" | "bytesSent",
+): MetricValue {
+  if (!isObservedCategory(audio.counterSource, RTP_AUDIO_COUNTER_SOURCE)) {
+    return unsupported();
+  }
+  return audio[key] ?? unsupported();
+}
+
+function audioPacketLossMetric(audio: Record<string, MetricValue>): MetricValue {
+  if (!isObservedCategory(audio.counterSource, RTP_AUDIO_COUNTER_SOURCE)) {
+    return unsupported();
+  }
+  return audio.packetsLost ?? unsupported();
 }
 
 export function deltaCumulativeMetric(prev: MetricValue, curr: MetricValue): MetricValue {
@@ -243,8 +275,8 @@ export function computeIntervalMetrics(
     metrics.candidatePairRttMs = observedNumber(rtt.value * 1000);
   }
   const recvDelta = deltaCumulativeMetric(
-    prev.inboundAudio.bytesReceived ?? unsupported(),
-    curr.inboundAudio.bytesReceived ?? unsupported(),
+    audioByteMetric(prev.inboundAudio, "bytesReceived"),
+    audioByteMetric(curr.inboundAudio, "bytesReceived"),
   );
   if (recvDelta.kind === "observed_number") {
     metrics.receiveBitrateBps = observedNumber((recvDelta.value * 8 * 1000) / dt);
@@ -252,23 +284,37 @@ export function computeIntervalMetrics(
     metrics.receiveBitrateBps = recvDelta;
   }
   const sendDelta = deltaCumulativeMetric(
-    prev.outboundAudio.bytesSent ?? unsupported(),
-    curr.outboundAudio.bytesSent ?? unsupported(),
+    audioByteMetric(prev.outboundAudio, "bytesSent"),
+    audioByteMetric(curr.outboundAudio, "bytesSent"),
   );
   if (sendDelta.kind === "observed_number") {
     metrics.sendBitrateBps = observedNumber((sendDelta.value * 8 * 1000) / dt);
   } else {
     metrics.sendBitrateBps = sendDelta;
   }
-  const lossDelta = deltaCumulativeMetric(
-    prev.inboundAudio.packetsLost ?? unsupported(),
-    curr.inboundAudio.packetsLost ?? unsupported(),
+  const transportRecvDelta = deltaCumulativeMetric(
+    prev.candidatePair.bytesReceived ?? unsupported(),
+    curr.candidatePair.bytesReceived ?? unsupported(),
   );
-  if (lossDelta.kind === "observed_number") {
-    metrics.packetLossDelta = lossDelta;
+  if (transportRecvDelta.kind === "observed_number") {
+    metrics.transportReceiveBitrateBps = observedNumber((transportRecvDelta.value * 8 * 1000) / dt);
   } else {
-    metrics.packetLossDelta = lossDelta;
+    metrics.transportReceiveBitrateBps = transportRecvDelta;
   }
+  const transportSendDelta = deltaCumulativeMetric(
+    prev.candidatePair.bytesSent ?? unsupported(),
+    curr.candidatePair.bytesSent ?? unsupported(),
+  );
+  if (transportSendDelta.kind === "observed_number") {
+    metrics.transportSendBitrateBps = observedNumber((transportSendDelta.value * 8 * 1000) / dt);
+  } else {
+    metrics.transportSendBitrateBps = transportSendDelta;
+  }
+  const lossDelta = deltaCumulativeMetric(
+    audioPacketLossMetric(prev.inboundAudio),
+    audioPacketLossMetric(curr.inboundAudio),
+  );
+  metrics.packetLossDelta = lossDelta;
   return metrics;
 }
 

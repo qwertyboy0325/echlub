@@ -241,6 +241,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 10
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 0,
@@ -252,6 +256,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 5
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -298,6 +306,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 15
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 2000,
@@ -309,6 +321,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 8
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -355,6 +371,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 20
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 4000,
@@ -366,6 +386,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 11
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -412,6 +436,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 25
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 6000,
@@ -423,6 +451,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 14
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -469,6 +501,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 30
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 8000,
@@ -480,6 +516,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 17
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -526,6 +566,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 35
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 10000,
@@ -537,6 +581,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 20
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -583,6 +631,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 40
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 12000,
@@ -594,6 +646,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 23
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -640,6 +696,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 45
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 14000,
@@ -651,6 +711,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 26
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -697,6 +761,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 50
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 16000,
@@ -708,6 +776,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 29
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -754,6 +826,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 55
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 18000,
@@ -765,6 +841,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 32
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -811,6 +891,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 60
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 20000,
@@ -822,6 +906,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 35
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -868,6 +956,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 65
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 22000,
@@ -879,6 +971,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 38
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -925,6 +1021,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 70
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 24000,
@@ -936,6 +1036,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 41
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -982,6 +1086,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 75
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 26000,
@@ -993,6 +1101,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 44
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1039,6 +1151,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 80
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 28000,
@@ -1050,6 +1166,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 47
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1096,6 +1216,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 85
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 30000,
@@ -1107,6 +1231,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 50
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1153,6 +1281,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 90
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 32000,
@@ -1164,6 +1296,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 53
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1210,6 +1346,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 95
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 34000,
@@ -1221,6 +1361,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 56
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1267,6 +1411,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 100
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 36000,
@@ -1278,6 +1426,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 59
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1324,6 +1476,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 105
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 38000,
@@ -1335,6 +1491,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 62
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1381,6 +1541,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 110
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 40000,
@@ -1392,6 +1556,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 65
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1438,6 +1606,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 115
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 42000,
@@ -1449,6 +1621,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 68
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1495,6 +1671,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 120
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 44000,
@@ -1506,6 +1686,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 71
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1552,6 +1736,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 125
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 46000,
@@ -1563,6 +1751,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 74
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1609,6 +1801,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 130
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 48000,
@@ -1620,6 +1816,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 77
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1666,6 +1866,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 135
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 50000,
@@ -1677,6 +1881,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 80
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1723,6 +1931,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 140
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 52000,
@@ -1734,6 +1946,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 83
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1780,6 +1996,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 145
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 54000,
@@ -1791,6 +2011,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 86
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1837,6 +2061,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 150
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 56000,
@@ -1848,6 +2076,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 89
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1894,6 +2126,10 @@
         "packetsReceived": {
           "kind": "observed_number",
           "value": 155
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "offsetMs": 58000,
@@ -1905,6 +2141,10 @@
         "packetsSent": {
           "kind": "observed_number",
           "value": 92
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {

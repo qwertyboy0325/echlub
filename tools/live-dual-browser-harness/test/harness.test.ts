@@ -10,6 +10,7 @@ import {
   scenarioLayout,
 } from "../src/paths.js";
 import {
+  allRequiredScenariosPassed,
   buildAutomationReport,
   classificationNeverClaimsPhysical,
   createScenarioReport,
@@ -148,12 +149,29 @@ describe("scenario pass gate", () => {
     expect(scenarioMayPass(report)).toBe(true);
   });
 
-  it("overall PASS requires both scenarios", () => {
-    const pass = createScenarioReport("peer_a_first", "/a");
-    pass.result = "PASS";
-    const fail = createScenarioReport("peer_b_first", "/b");
-    expect(overallPassRequiresAllScenarios([pass])).toBe(true);
-    expect(overallPassRequiresAllScenarios([pass, fail])).toBe(false);
+  it("overall PASS requires exactly peer_a_first and peer_b_first PASS scenarios", () => {
+    const passA = createScenarioReport("peer_a_first", "/a");
+    passA.result = "PASS";
+    passA.readyReached = true;
+    passA.completedReached = true;
+    passA.finalizedDownloads = "PASS";
+    passA.peerAEndpointValidation = "PASS";
+    passA.peerBEndpointValidation = "PASS";
+    passA.pairing = "PASS";
+    passA.directoryVerification = "PASS";
+    passA.uiClickDispatchDeltaMs = 1;
+    passA.actualEndpointStartDeltaMs = 2;
+
+    const passB = createScenarioReport("peer_b_first", "/b");
+    Object.assign(passB, { ...passA, connectOrder: "peer_b_first" as const, outputDirectory: "/b" });
+
+    expect(allRequiredScenariosPassed([])).toBe(false);
+    expect(allRequiredScenariosPassed([passA])).toBe(false);
+    expect(allRequiredScenariosPassed([passA, passA])).toBe(false);
+    expect(allRequiredScenariosPassed([passA, { ...passB, result: "FAILED" as const }])).toBe(false);
+    expect(allRequiredScenariosPassed([passA, passB])).toBe(true);
+    expect(allRequiredScenariosPassed([passA, passB, passA])).toBe(false);
+    expect(overallPassRequiresAllScenarios([passA, passB])).toBe(true);
   });
 });
 

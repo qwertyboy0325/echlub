@@ -233,6 +233,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -243,6 +247,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 500
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -290,6 +298,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -300,6 +312,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 800
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -347,6 +363,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -357,6 +377,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 1100
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -404,6 +428,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -414,6 +442,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 1400
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -461,6 +493,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -471,6 +507,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 1700
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -518,6 +558,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -528,6 +572,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 2000
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -575,6 +623,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -585,6 +637,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 2300
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -632,6 +688,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -642,6 +702,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 2600
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -689,6 +753,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -699,6 +767,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 2900
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -746,6 +818,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -756,6 +832,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 3200
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -803,6 +883,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -813,6 +897,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 3500
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -860,6 +948,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -870,6 +962,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 3800
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -917,6 +1013,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -927,6 +1027,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 4100
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -974,6 +1078,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -984,6 +1092,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 4400
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1031,6 +1143,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1041,6 +1157,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 4700
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1088,6 +1208,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1098,6 +1222,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 5000
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1145,6 +1273,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1155,6 +1287,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 5300
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1202,6 +1338,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1212,6 +1352,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 5600
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1259,6 +1403,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1269,6 +1417,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 5900
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1316,6 +1468,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1326,6 +1482,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 6200
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1373,6 +1533,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1383,6 +1547,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 6500
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1430,6 +1598,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1440,6 +1612,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 6800
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1487,6 +1663,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1497,6 +1677,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 7100
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1544,6 +1728,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1554,6 +1742,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 7400
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1601,6 +1793,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1611,6 +1807,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 7700
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1658,6 +1858,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1668,6 +1872,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 8000
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1715,6 +1923,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1725,6 +1937,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 8300
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1772,6 +1988,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1782,6 +2002,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 8600
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1829,6 +2053,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1839,6 +2067,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 8900
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {
@@ -1886,6 +2118,10 @@
         "jitterBufferTargetDelay": {
           "kind": "observed_number",
           "value": 0.015
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "outboundAudio": {
@@ -1896,6 +2132,10 @@
         "bytesSent": {
           "kind": "observed_number",
           "value": 9200
+        },
+        "counterSource": {
+          "kind": "observed_category",
+          "value": "rtp_audio"
         }
       },
       "remoteInboundAudio": {

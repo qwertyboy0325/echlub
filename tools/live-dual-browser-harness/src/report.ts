@@ -59,6 +59,20 @@ export function createScenarioReport(
   };
 }
 
+export function allRequiredScenariosPassed(scenarios: ScenarioReport[]): boolean {
+  if (scenarios.length !== 2) {
+    return false;
+  }
+  const orders = scenarios.map((scenario) => scenario.connectOrder);
+  if (new Set(orders).size !== 2) {
+    return false;
+  }
+  if (!orders.includes("peer_a_first") || !orders.includes("peer_b_first")) {
+    return false;
+  }
+  return scenarios.every((scenario) => scenario.result === "PASS" && scenarioMayPass(scenario));
+}
+
 export function buildAutomationReport(input: {
   authorizedCommit: string;
   result: AutomationResult;
@@ -66,14 +80,14 @@ export function buildAutomationReport(input: {
   observationSeconds: number;
   notes?: string[];
 }): AutomationReport {
-  const allRequiredScenariosPassed =
-    input.scenarios.length > 0 && input.scenarios.every((scenario) => scenario.result === "PASS");
+  const requiredPassed = allRequiredScenariosPassed(input.scenarios);
+  const derivedResult: AutomationResult = requiredPassed ? "PASS" : input.result;
   return {
     schemaVersion: AUTOMATION_SCHEMA_VERSION,
     classification: "automated_single_host_dual_browser",
     evidenceAuthority: "readiness_only",
     physicalTwoDeviceObservationSatisfied: false,
-    allRequiredScenariosPassed,
+    allRequiredScenariosPassed: requiredPassed,
     sameHost: true,
     separateBrowserProcesses: true,
     fakeMicrophones: true,
@@ -82,7 +96,7 @@ export function buildAutomationReport(input: {
     independentHardwareClocksProven: false,
     acousticLatencyMeasured: false,
     authorizedCommit: input.authorizedCommit,
-    result: input.result,
+    result: derivedResult,
     scenarios: input.scenarios,
     observationSeconds: input.observationSeconds,
     notes: input.notes ?? [
@@ -104,7 +118,7 @@ export function classificationNeverClaimsPhysical(report: AutomationReport): boo
 }
 
 export function overallPassRequiresAllScenarios(scenarios: ScenarioReport[]): boolean {
-  return scenarios.length > 0 && scenarios.every((scenario) => scenario.result === "PASS");
+  return allRequiredScenariosPassed(scenarios);
 }
 
 export function scenarioMayPass(report: ScenarioReport): boolean {

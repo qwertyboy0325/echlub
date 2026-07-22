@@ -1,7 +1,7 @@
 use echlub_performance::{
     build_manifest_entries, compute_live_endpoint_derived, pair_live_endpoints,
-    validate_cross_device_clock_timestamps, validate_live_endpoint, verify_live_artifact_manifest,
-    LiveValidationError, LIVE_SCHEMA_VERSION,
+    validate_cross_device_clock_timestamps, validate_live_directory, validate_live_endpoint,
+    verify_live_artifact_manifest, LiveValidationError, LIVE_SCHEMA_VERSION,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -116,7 +116,7 @@ fn rejects_draft_export_kind_as_finalized() {
 #[test]
 fn live_directory_manifest_verification_passes() {
     let dir = vector_path("live-directory-v1");
-    let result = verify_live_artifact_manifest(&dir);
+    let result = validate_live_directory(&dir);
     assert!(result.valid, "errors: {:?}", result.errors);
 }
 
@@ -283,6 +283,75 @@ fn derived_clock_summary_excludes_invalid_probes() {
         baseline_summary["medianClockProbeRttMs"],
         tampered_summary["medianClockProbeRttMs"]
     );
+}
+
+#[test]
+fn rejects_transport_only_packet_progression_fixture() {
+    let mut json: serde_json::Value =
+        serde_json::from_str(&read_vector("live-endpoint-finalized-peer-a-v1.json")).unwrap();
+    for sample in json["statsSamples"].as_array_mut().unwrap() {
+        sample["inboundAudio"] = serde_json::json!({});
+        sample["outboundAudio"] = serde_json::json!({});
+        if let Some(cp) = sample.get_mut("candidatePair") {
+            cp["packetsReceived"] = serde_json::json!({"kind":"observed_number","value":100});
+            cp["packetsSent"] = serde_json::json!({"kind":"observed_number","value":100});
+        }
+    }
+    let result = validate_live_endpoint(&json.to_string(), true);
+    assert!(!result.valid);
+    assert!(result.errors.iter().any(|e| {
+        matches!(
+            e,
+            LiveValidationError::NoInboundRtpAudioProgression
+                | LiveValidationError::NoOutboundRtpAudioProgression
+                | LiveValidationError::InvalidAudioCounterProvenance
+        )
+    }));
+}
+
+#[test]
+fn live_directory_semantic_summary_mismatch_fails_after_checksum_regeneration() {
+    use echlub_performance::checksum_bytes;
+
+    let src = vector_path("live-directory-v1");
+    let temp = std::env::temp_dir().join("echlub-live-directory-semantic-mismatch");
+    let _ = fs::remove_dir_all(&temp);
+    fs::create_dir_all(&temp).unwrap();
+    for entry in fs::read_dir(&src).unwrap() {
+        let entry = entry.unwrap();
+        fs::copy(entry.path(), temp.join(entry.file_name())).unwrap();
+    }
+
+    let summary_path = temp.join("peer-a.summary.json");
+    let mut summary: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&summary_path).unwrap()).unwrap();
+    if let Some(obj) = summary.as_object_mut() {
+        obj.insert("staleMarker".into(), serde_json::json!("semantic-tamper"));
+    }
+    let summary_bytes = serde_json::to_vec_pretty(&summary).unwrap();
+    fs::write(&summary_path, &summary_bytes).unwrap();
+
+    let manifest_path = temp.join("artifact-manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+    for entry in manifest["artifacts"].as_array_mut().unwrap() {
+        if entry["filename"] == "peer-a.summary.json" {
+            entry["checksum"] = serde_json::json!(checksum_bytes(&summary_bytes));
+        }
+    }
+    fs::write(
+        manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    let result = validate_live_directory(&temp);
+    let _ = fs::remove_dir_all(&temp);
+    assert!(!result.valid);
+    assert!(result.errors.iter().any(|e| matches!(
+        e,
+        LiveValidationError::ManifestVerification(msg) if msg.contains("peer-a.summary.json")
+    )));
 }
 
 #[test]

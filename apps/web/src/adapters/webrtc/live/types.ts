@@ -142,6 +142,16 @@ export function isObservedNumber(
   return metric.kind === "observed_number";
 }
 
+export function isObservedCategory(
+  metric: MetricValue | undefined,
+  value: string,
+): metric is { kind: "observed_category"; value: string } {
+  return metric?.kind === "observed_category" && metric.value === value;
+}
+
+export const RTP_AUDIO_COUNTER_SOURCE = "rtp_audio" as const;
+export const CANDIDATE_PAIR_TRANSPORT_COUNTER_SOURCE = "candidate_pair_transport" as const;
+
 export const CANDIDATE_CATEGORIES = ["host", "srflx", "prflx", "relay"] as const;
 export type CandidateCategory = (typeof CANDIDATE_CATEGORIES)[number];
 

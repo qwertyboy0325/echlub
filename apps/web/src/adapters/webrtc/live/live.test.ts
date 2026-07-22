@@ -11,10 +11,11 @@ import {
   validLocalCompletedProbes,
 } from "./clock-probe";
 import {
-  applyCandidatePairAudioFallback,
+  collectNormalizedStats,
   collectStatsPreflight,
   computeIntervalMetrics,
   deltaCumulativeMetric,
+  hasRtpAudioCounterAvailability,
   StatsSampler,
 } from "./stats-sampler";
 import { LiveWebRtcSession } from "./session";
@@ -24,7 +25,14 @@ import {
   createNegotiationState,
   IceCandidateBuffer,
 } from "./negotiation";
-import { invalid, observedNumber, unsupported, unavailable } from "./types";
+import {
+  invalid,
+  observedCategory,
+  observedNumber,
+  RTP_AUDIO_COUNTER_SOURCE,
+  unsupported,
+  unavailable,
+} from "./types";
 
 import type { ClockProbeSample, PeerRole } from "./types";
 
@@ -204,11 +212,19 @@ describe("responder identity", () => {
 });
 
 describe("stats interval metrics", () => {
+  const rtpSource = observedCategory(RTP_AUDIO_COUNTER_SOURCE);
   const baseSample = (bytes: number, offsetMs: number) => ({
     offsetMs,
     candidatePair: {},
-    inboundAudio: { bytesReceived: observedNumber(bytes), packetsLost: observedNumber(0) },
-    outboundAudio: { bytesSent: observedNumber(bytes) },
+    inboundAudio: {
+      counterSource: rtpSource,
+      bytesReceived: observedNumber(bytes),
+      packetsLost: observedNumber(0),
+    },
+    outboundAudio: {
+      counterSource: rtpSource,
+      bytesSent: observedNumber(bytes),
+    },
     remoteInboundAudio: {},
     codec: {},
   });
@@ -255,13 +271,27 @@ describe("stats interval metrics", () => {
     const metrics = computeIntervalMetrics(
       {
         ...baseSample(100, 0),
-        inboundAudio: { bytesReceived: observedNumber(10), packetsLost: observedNumber(5) },
-        outboundAudio: { bytesSent: observedNumber(10) },
+        inboundAudio: {
+          counterSource: rtpSource,
+          bytesReceived: observedNumber(10),
+          packetsLost: observedNumber(5),
+        },
+        outboundAudio: {
+          counterSource: rtpSource,
+          bytesSent: observedNumber(10),
+        },
       },
       {
         ...baseSample(200, 1000),
-        inboundAudio: { bytesReceived: observedNumber(3), packetsLost: observedNumber(1) },
-        outboundAudio: { bytesSent: observedNumber(3) },
+        inboundAudio: {
+          counterSource: rtpSource,
+          bytesReceived: observedNumber(3),
+          packetsLost: observedNumber(1),
+        },
+        outboundAudio: {
+          counterSource: rtpSource,
+          bytesSent: observedNumber(3),
+        },
       },
     );
     expect(metrics.receiveBitrateBps).toEqual(invalid("counter_reset"));
@@ -275,43 +305,35 @@ describe("stats interval metrics", () => {
     );
   });
 
-  it("derives bitrates from candidate-pair fallback on consecutive samples", () => {
+  it("does not derive audio bitrate from transport-only counters", () => {
     const candidatePair = (bytes: number, packets: number) => ({
+      counterSource: observedCategory("candidate_pair_transport"),
       packetsReceived: observedNumber(packets),
       packetsSent: observedNumber(packets),
       bytesReceived: observedNumber(bytes),
       bytesSent: observedNumber(bytes),
     });
-    const prevInbound: Record<string, ReturnType<typeof observedNumber>> = {};
-    const prevOutbound: Record<string, ReturnType<typeof observedNumber>> = {};
-    const currInbound: Record<string, ReturnType<typeof observedNumber>> = {};
-    const currOutbound: Record<string, ReturnType<typeof observedNumber>> = {};
-    applyCandidatePairAudioFallback(prevInbound, prevOutbound, candidatePair(1000, 10));
-    applyCandidatePairAudioFallback(currInbound, currOutbound, candidatePair(2000, 20));
     const prev = {
       offsetMs: 0,
       candidatePair: candidatePair(1000, 10),
-      inboundAudio: prevInbound,
-      outboundAudio: prevOutbound,
+      inboundAudio: {},
+      outboundAudio: {},
       remoteInboundAudio: {},
       codec: {},
     };
     const curr = {
       offsetMs: 1000,
       candidatePair: candidatePair(2000, 20),
-      inboundAudio: currInbound,
-      outboundAudio: currOutbound,
+      inboundAudio: {},
+      outboundAudio: {},
       remoteInboundAudio: {},
       codec: {},
     };
     const metrics = computeIntervalMetrics(prev, curr);
-    expect(metrics.receiveBitrateBps).toEqual({ kind: "observed_number", value: 8000 });
-    expect(metrics.sendBitrateBps).toEqual({ kind: "observed_number", value: 8000 });
-    expect(currInbound.packetsReceived).toEqual(observedNumber(20));
-    expect(currOutbound.packetsSent).toEqual(observedNumber(20));
-    expect(currInbound.jitter).toEqual(unsupported());
-    expect(currInbound.packetsLost).toEqual(unsupported());
-    expect(metrics.packetLossDelta).toEqual(unsupported());
+    expect(metrics.receiveBitrateBps).toEqual(unsupported());
+    expect(metrics.sendBitrateBps).toEqual(unsupported());
+    expect(metrics.transportReceiveBitrateBps).toEqual({ kind: "observed_number", value: 8000 });
+    expect(metrics.transportSendBitrateBps).toEqual({ kind: "observed_number", value: 8000 });
   });
 });
 
@@ -704,6 +726,7 @@ describe("session ready gate and export", () => {
       remoteStream: MediaStream;
       clockSamples: ClockProbeSample[];
       statsPreflightComplete: boolean;
+      statsPreflightHasRtpAudio: boolean;
       negotiation: { makingOffer: boolean; isSettingRemoteAnswerPending: boolean };
       collectReadyFailures: () => string[];
       evaluateReadyToObserve: () => void;
@@ -722,6 +745,7 @@ describe("session ready gate and export", () => {
     } as MediaStream;
     internal.clockSamples = [probeSample({ requesterRole: "peer_a", responderRole: "peer_b" })];
     internal.statsPreflightComplete = true;
+    internal.statsPreflightHasRtpAudio = true;
     internal.negotiation = { makingOffer: false, isSettingRemoteAnswerPending: false };
     Object.assign(internal, overrides);
     return internal;
@@ -790,6 +814,7 @@ describe("session ready gate and export", () => {
       remoteStream: MediaStream;
       clockSamples: ClockProbeSample[];
       statsPreflightComplete: boolean;
+      statsPreflightHasRtpAudio: boolean;
       collectReadyFailures: () => string[];
     };
     internal.localStream = {
@@ -806,6 +831,7 @@ describe("session ready gate and export", () => {
     } as MediaStream;
     internal.clockSamples = [probeSample({ requesterRole: "peer_a", responderRole: "peer_b" })];
     internal.statsPreflightComplete = true;
+    internal.statsPreflightHasRtpAudio = true;
     expect(internal.collectReadyFailures()).toEqual([]);
   });
 
@@ -818,6 +844,7 @@ describe("session ready gate and export", () => {
       remoteStream: MediaStream;
       clockSamples: ClockProbeSample[];
       statsPreflightComplete: boolean;
+      statsPreflightHasRtpAudio: boolean;
       collectReadyFailures: () => string[];
     };
     internal.localStream = {
@@ -916,6 +943,19 @@ describe("typed stats normalization", () => {
       getStats: vi.fn().mockResolvedValue(stats),
     } as unknown as RTCPeerConnection;
     const sample = await collectStatsPreflight(pc);
+    expect(sample.inboundAudio.counterSource).toEqual({
+      kind: "observed_category",
+      value: RTP_AUDIO_COUNTER_SOURCE,
+    });
+    expect(sample.outboundAudio.counterSource).toEqual({
+      kind: "observed_category",
+      value: RTP_AUDIO_COUNTER_SOURCE,
+    });
+    expect(sample.candidatePair.counterSource).toEqual({
+      kind: "observed_category",
+      value: "candidate_pair_transport",
+    });
+    expect(hasRtpAudioCounterAvailability(sample)).toBe(true);
     expect(sample.candidatePair.state).toEqual({ kind: "observed_category", value: "succeeded" });
     expect(sample.candidatePair.nominated).toEqual({ kind: "observed_boolean", value: true });
     expect(sample.candidatePair.protocol).toEqual({ kind: "observed_category", value: "udp" });
@@ -956,6 +996,7 @@ describe("offer creation", () => {
 describe("peer discovery negotiation order", () => {
   function makeSession(role: PeerRole) {
     const onNegotiation = vi.fn();
+    const onError = vi.fn();
     const callbacks = {
       onPhaseChange: vi.fn(),
       onSignalingState: vi.fn(),
@@ -967,7 +1008,7 @@ describe("peer discovery negotiation order", () => {
       onNegotiation,
       onClockProbe: vi.fn(),
       onStatsSample: vi.fn(),
-      onError: vi.fn(),
+      onError,
     };
     const session = new LiveWebRtcSession(
       {
@@ -979,16 +1020,22 @@ describe("peer discovery negotiation order", () => {
     );
     const internal = session as unknown as {
       handlePeerJoined: (peerId: string) => void;
+      maybeStartInitialNegotiation: (trigger: "negotiation_needed" | "peer_joined") => void;
       peerNegotiationStarted: boolean;
+      peerPresent: boolean;
       pc: RTCPeerConnection | null;
+      negotiation: { makingOffer: boolean };
+      wirePeerConnection: (pc: RTCPeerConnection) => void;
     };
     internal.pc = {
       createOffer: vi.fn().mockResolvedValue({ type: "offer", sdp: "v=0" }),
       setLocalDescription: vi.fn().mockResolvedValue(undefined),
       localDescription: { type: "offer", sdp: "v=0" },
       signalingState: "stable",
+      onnegotiationneeded: null as (() => void) | null,
     } as unknown as RTCPeerConnection;
-    return { session, onNegotiation, internal, callbacks };
+    internal.wirePeerConnection(internal.pc);
+    return { session, onNegotiation, onError, internal, callbacks };
   }
 
   it("peer_a initiates exactly one negotiation when learning peer_b already exists", () => {
@@ -1010,5 +1057,46 @@ describe("peer discovery negotiation order", () => {
     const { onNegotiation, internal } = makeSession("peer_a");
     internal.handlePeerJoined("peer_a");
     expect(onNegotiation).not.toHaveBeenCalled();
+  });
+
+  it("does not offer before peer discovery on negotiationneeded", () => {
+    const { onNegotiation, internal } = makeSession("peer_a");
+    internal.maybeStartInitialNegotiation("negotiation_needed");
+    expect(onNegotiation).not.toHaveBeenCalled();
+    expect(internal.peerNegotiationStarted).toBe(false);
+  });
+
+  it("offers once when peer discovery follows earlier negotiationneeded", () => {
+    const { onNegotiation, internal } = makeSession("peer_a");
+    internal.maybeStartInitialNegotiation("negotiation_needed");
+    internal.handlePeerJoined("peer_b");
+    expect(onNegotiation).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers once when negotiationneeded follows peer discovery", async () => {
+    const { onNegotiation, internal } = makeSession("peer_a");
+    internal.handlePeerJoined("peer_b");
+    internal.maybeStartInitialNegotiation("negotiation_needed");
+    expect(onNegotiation).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    expect(internal.pc?.createOffer).toHaveBeenCalledTimes(1);
+    expect(internal.pc?.setLocalDescription).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start a second offer after initial negotiation started", () => {
+    const { onNegotiation, internal } = makeSession("peer_a");
+    internal.peerPresent = true;
+    internal.peerNegotiationStarted = true;
+    internal.maybeStartInitialNegotiation("negotiation_needed");
+    expect(onNegotiation).not.toHaveBeenCalled();
+  });
+
+  it("surfaces failed initial offer without leaving started state when unsafe", async () => {
+    const { onError, internal } = makeSession("peer_a");
+    internal.pc!.createOffer = vi.fn().mockRejectedValue(new Error("offer failed"));
+    internal.handlePeerJoined("peer_b");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(onError).toHaveBeenCalled();
+    expect(internal.peerNegotiationStarted).toBe(false);
   });
 });

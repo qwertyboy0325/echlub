@@ -28,6 +28,7 @@ import {
 } from "./peer-runner.js";
 import { ProcessManager } from "./process-manager.js";
 import {
+  allRequiredScenariosPassed,
   buildAutomationReport,
   createScenarioReport,
   scenarioMayPass,
@@ -99,17 +100,17 @@ async function runScenario(options: {
   const report = createScenarioReport(options.order, layout.scenarioDir);
   const userDataA = createTempUserDataDir("echlub-live-a-");
   const userDataB = createTempUserDataDir("echlub-live-b-");
-  if (userDataA === userDataB) {
-    report.error = "peer browser user-data directories must be distinct";
-    return report;
-  }
 
   let peerA: PeerSession | null = null;
   let peerB: PeerSession | null = null;
   let peerADiagnostics = emptyDiagnostics("peer A not launched");
   let peerBDiagnostics = emptyDiagnostics("peer B not launched");
+  let diagnosticCaptureFailed = false;
 
   try {
+    if (userDataA === userDataB) {
+      throw new Error("peer browser user-data directories must be distinct");
+    }
     peerA = await launchPeer({
       role: "peer_a",
       correlationId: options.correlationId,
@@ -184,16 +185,54 @@ async function runScenario(options: {
     }
   } finally {
     if (peerA !== null) {
-      peerADiagnostics = await capturePeerArtifacts(peerA, layout.diagnosticsDir, "peer-a");
-      await closePeer(peerA);
+      try {
+        peerADiagnostics = await capturePeerArtifacts(peerA, layout.diagnosticsDir, "peer-a");
+      } catch (error) {
+        diagnosticCaptureFailed = true;
+        const message = error instanceof Error ? error.message : String(error);
+        peerADiagnostics = emptyDiagnostics(`peer A diagnostic capture failed: ${message}`);
+      } finally {
+        try {
+          await closePeer(peerA);
+        } catch (error) {
+          diagnosticCaptureFailed = true;
+          const message = error instanceof Error ? error.message : String(error);
+          peerADiagnostics.error = `${peerADiagnostics.error}; close failed: ${message}`;
+        }
+        removeTempUserDataDir(userDataA);
+      }
+    } else {
+      removeTempUserDataDir(userDataA);
     }
+
     if (peerB !== null) {
-      peerBDiagnostics = await capturePeerArtifacts(peerB, layout.diagnosticsDir, "peer-b");
-      await closePeer(peerB);
+      try {
+        peerBDiagnostics = await capturePeerArtifacts(peerB, layout.diagnosticsDir, "peer-b");
+      } catch (error) {
+        diagnosticCaptureFailed = true;
+        const message = error instanceof Error ? error.message : String(error);
+        peerBDiagnostics = emptyDiagnostics(`peer B diagnostic capture failed: ${message}`);
+      } finally {
+        try {
+          await closePeer(peerB);
+        } catch (error) {
+          diagnosticCaptureFailed = true;
+          const message = error instanceof Error ? error.message : String(error);
+          peerBDiagnostics.error = `${peerBDiagnostics.error}; close failed: ${message}`;
+        }
+        removeTempUserDataDir(userDataB);
+      }
+    } else {
+      removeTempUserDataDir(userDataB);
     }
-    removeTempUserDataDir(userDataA);
-    removeTempUserDataDir(userDataB);
+
     await writeScenarioDiagnostics(layout, options.runProcessLog, peerADiagnostics, peerBDiagnostics);
+    if (diagnosticCaptureFailed && report.result === "PASS") {
+      report.result = "FAILED";
+      report.error = report.error ?? "diagnostic capture failed";
+    } else if (diagnosticCaptureFailed) {
+      report.error = report.error ?? "diagnostic capture failed";
+    }
   }
 
   return report;
@@ -233,7 +272,7 @@ async function main(): Promise<number> {
       }
     }
 
-    if (!scenarios.every((scenario) => scenario.result === "PASS")) {
+    if (!allRequiredScenariosPassed(scenarios)) {
       finalResult = "FAILED";
     }
   } catch (error) {
@@ -274,4 +313,4 @@ main()
     process.exit(1);
   });
 
-export { runScenario, scenarioMayPass };
+export { runScenario, scenarioMayPass, allRequiredScenariosPassed };

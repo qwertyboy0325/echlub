@@ -7,12 +7,12 @@
   "artifacts": [
     {
       "filename": "peer-a.validated.json",
-      "checksum": "fce607c903f39e86328d07405aec4eba3f101ed59687585feb9bd4b761bc419f",
+      "checksum": "cd3c6f5fedc4509d940ee212899e7ed1bf56e19b2012b295a98538d24d908526",
       "artifactRole": "live-endpoint-validated-peer-a"
     },
     {
       "filename": "peer-b.validated.json",
-      "checksum": "d6156fc26d12f87980ca84ffe0115d10a8ec510cd983ddad2e64487123ee4d13",
+      "checksum": "ab3bb16a62a07c6845cae936552130577d2d402fe1a0a67fea1da8bb94a9b347",
       "artifactRole": "live-endpoint-validated-peer-b"
     },
     {

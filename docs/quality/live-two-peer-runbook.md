@@ -1,6 +1,16 @@
 # Live Two-Peer Runbook
 
-> **Status: SUSPENDED** pending owner external review before manual two-device observation. Automated correction packages harden harness, validators, and setup flow; live endpoint evidence still requires owner run per stop gate `OWNER_LIVE_RUN_REQUIRED`.
+> **Status: SUSPENDED** pending owner external review before manual two-device observation. Automated correction packages harden harness, validators, and setup flow.
+
+```yaml
+physical_two_device_test:
+  status: deferred
+  required_for_this_merge: false
+  evidence_claimed: false
+  future_gate: separate owner-authorized evidence run
+```
+
+Physical two-device observation is **not** a merge prerequisite for PR #1. A future owner-authorized run remains the gate for physical evidence claims.
 
 ## Optional readiness preflight (single host)
 
