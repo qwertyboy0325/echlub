@@ -78,20 +78,27 @@ export function canonicalizeClockProbeSampleForExport(sample: ClockProbeSample):
   ) {
     return roundTripped;
   }
-  const validation = validateCrossDeviceClockTimestamps(
-    roundTripped.t0,
-    roundTripped.t1,
-    roundTripped.t2,
-    roundTripped.t3,
-  );
+  const t0 = jsonStableFloat(roundTripped.t0);
+  const t1 = jsonStableFloat(roundTripped.t1);
+  const t2 = jsonStableFloat(roundTripped.t2);
+  const t3 = jsonStableFloat(roundTripped.t3);
+  const validation = validateCrossDeviceClockTimestamps(t0, t1, t2, t3);
   if (!validation.valid || validation.rttMs === null) {
-    return roundTripped;
+    return { ...roundTripped, t0, t1, t2, t3 };
   }
   return {
     ...roundTripped,
-    rttMs: validation.rttMs,
-    offsetMs: validation.offsetMs,
+    t0,
+    t1,
+    t2,
+    t3,
+    rttMs: jsonStableFloat(validation.rttMs),
+    offsetMs: validation.offsetMs === null ? null : jsonStableFloat(validation.offsetMs),
   };
+}
+
+function jsonStableFloat(value: number): number {
+  return Number.parseFloat(value.toFixed(3));
 }
 
 export function verifyStoredClockMetrics(
