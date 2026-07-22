@@ -13,6 +13,26 @@ pub const ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_B: &str = "live-endpoint-summary-p
 pub const ARTIFACT_ROLE_PAIR_SUMMARY: &str = "live-observation-pair-summary";
 pub const ARTIFACT_ROLE_PAIR_REPORT: &str = "live-pair-report";
 
+pub const LIVE_PAIR_REPORT_DISCLAIMER_PREFIX: &str =
+    "Exploratory non-authoritative two-peer browser observation.";
+
+pub fn required_live_artifact_spec() -> &'static [(&'static str, &'static str)] {
+    &[
+        (
+            "peer-a.validated.json",
+            ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_A,
+        ),
+        (
+            "peer-b.validated.json",
+            ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_B,
+        ),
+        ("peer-a.summary.json", ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_A),
+        ("peer-b.summary.json", ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_B),
+        ("pair-summary.json", ARTIFACT_ROLE_PAIR_SUMMARY),
+        ("report.md", ARTIFACT_ROLE_PAIR_REPORT),
+    ]
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LivePeerRole {

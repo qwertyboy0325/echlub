@@ -23,24 +23,47 @@ interface ProbeResponse {
   t2: number;
 }
 
+export interface CrossDeviceClockValidation {
+  valid: boolean;
+  rttMs: number | null;
+  offsetMs: number | null;
+}
+
 function utf8ByteLength(value: string): number {
   return new TextEncoder().encode(value).length;
 }
 
-function oppositeRole(role: PeerRole): PeerRole {
+export function oppositeRole(role: PeerRole): PeerRole {
   return role === "peer_a" ? "peer_b" : "peer_a";
 }
 
-function isFiniteTimestampChain(t0: number, t1: number, t2: number, t3: number): boolean {
-  return (
-    Number.isFinite(t0) &&
-    Number.isFinite(t1) &&
-    Number.isFinite(t2) &&
-    Number.isFinite(t3) &&
-    t0 <= t1 &&
-    t1 <= t2 &&
-    t2 <= t3
-  );
+export function validateCrossDeviceClockTimestamps(
+  t0: number,
+  t1: number,
+  t2: number,
+  t3: number,
+): CrossDeviceClockValidation {
+  if (![t0, t1, t2, t3].every(Number.isFinite)) {
+    return { valid: false, rttMs: null, offsetMs: null };
+  }
+  if (t3 < t0 || t2 < t1) {
+    return { valid: false, rttMs: null, offsetMs: null };
+  }
+  const remoteProcessingDuration = t2 - t1;
+  const localRoundTripDuration = t3 - t0;
+  if (remoteProcessingDuration < 0 || localRoundTripDuration < 0) {
+    return { valid: false, rttMs: null, offsetMs: null };
+  }
+  const rtt = localRoundTripDuration - remoteProcessingDuration;
+  if (!Number.isFinite(rtt) || rtt < 0) {
+    return { valid: false, rttMs: null, offsetMs: null };
+  }
+  const offset = (t1 - t0 + (t2 - t3)) / 2;
+  return {
+    valid: true,
+    rttMs: rtt,
+    offsetMs: Number.isFinite(offset) ? offset : null,
+  };
 }
 
 export class ClockProbeEngine {
@@ -112,6 +135,7 @@ export class ClockProbeEngine {
   private invalidSample(
     sequence: number,
     requesterRole: PeerRole,
+    responderRole: PeerRole | null,
     protocolVersion: number,
     t0: number,
     t1: number | null = null,
@@ -121,7 +145,8 @@ export class ClockProbeEngine {
   ): ClockProbeSample {
     return {
       sequence,
-      senderRole: requesterRole,
+      requesterRole,
+      responderRole,
       protocolVersion,
       t0,
       t1,
@@ -152,7 +177,19 @@ export class ClockProbeEngine {
     if (utf8ByteLength(encoded) > MAX_PROBE_PAYLOAD_BYTES) return;
 
     if (this.sentSequences.has(key)) {
-      this.onSample(this.invalidSample(sequence, this.localRole, CLOCK_PROBE_PROTOCOL_VERSION, t0, null, null, null, { duplicate: true }));
+      this.onSample(
+        this.invalidSample(
+          sequence,
+          this.localRole,
+          null,
+          CLOCK_PROBE_PROTOCOL_VERSION,
+          t0,
+          null,
+          null,
+          null,
+          { duplicate: true },
+        ),
+      );
       return;
     }
     this.sentSequences.add(key);
@@ -161,7 +198,8 @@ export class ClockProbeEngine {
       this.pending.delete(key);
       this.onSample({
         sequence,
-        senderRole: this.localRole,
+        requesterRole: this.localRole,
+        responderRole: null,
         protocolVersion: CLOCK_PROBE_PROTOCOL_VERSION,
         t0,
         t1: null,
@@ -185,10 +223,13 @@ export class ClockProbeEngine {
       if (msg.protocolVersion !== CLOCK_PROBE_PROTOCOL_VERSION) {
         const requesterRole =
           "requesterRole" in msg && msg.requesterRole ? msg.requesterRole : this.localRole;
+        const responderRole =
+          "responderRole" in msg && msg.responderRole ? msg.responderRole : null;
         this.onSample(
           this.invalidSample(
             "sequence" in msg ? msg.sequence : -1,
             requesterRole,
+            responderRole,
             msg.protocolVersion ?? 0,
             "t0" in msg && Number.isFinite(msg.t0) ? msg.t0 : 0,
           ),
@@ -224,14 +265,32 @@ export class ClockProbeEngine {
 
         if (requesterRole !== this.localRole) {
           this.onSample(
-            this.invalidSample(sequence, requesterRole, msg.protocolVersion, t0, t1, t2, null),
+            this.invalidSample(
+              sequence,
+              requesterRole,
+              responderRole,
+              msg.protocolVersion,
+              t0,
+              t1,
+              t2,
+              null,
+            ),
           );
           return;
         }
 
         if (responderRole !== oppositeRole(this.localRole)) {
           this.onSample(
-            this.invalidSample(sequence, requesterRole, msg.protocolVersion, t0, t1, t2, null),
+            this.invalidSample(
+              sequence,
+              requesterRole,
+              responderRole,
+              msg.protocolVersion,
+              t0,
+              t1,
+              t2,
+              null,
+            ),
           );
           return;
         }
@@ -241,7 +300,8 @@ export class ClockProbeEngine {
         if (this.completedResponses.has(responseKey)) {
           this.onSample({
             sequence,
-            senderRole: requesterRole,
+            requesterRole,
+            responderRole,
             protocolVersion: msg.protocolVersion,
             t0,
             t1,
@@ -261,7 +321,8 @@ export class ClockProbeEngine {
         if (!pending) {
           this.onSample({
             sequence,
-            senderRole: requesterRole,
+            requesterRole,
+            responderRole,
             protocolVersion: msg.protocolVersion,
             t0,
             t1,
@@ -280,34 +341,35 @@ export class ClockProbeEngine {
         clearTimeout(pending.timeoutId);
         this.pending.delete(key);
         const t3 = performance.timeOrigin + performance.now();
-
-        if (!isFiniteTimestampChain(t0, t1, t2, t3)) {
+        const validation = validateCrossDeviceClockTimestamps(t0, t1, t2, t3);
+        if (!validation.valid) {
           this.onSample(
-            this.invalidSample(sequence, requesterRole, msg.protocolVersion, t0, t1, t2, t3),
-          );
-          return;
-        }
-
-        const rtt = t3 - t0 - (t2 - t1);
-        if (!Number.isFinite(rtt) || rtt < 0) {
-          this.onSample(
-            this.invalidSample(sequence, requesterRole, msg.protocolVersion, t0, t1, t2, t3),
+            this.invalidSample(
+              sequence,
+              requesterRole,
+              responderRole,
+              msg.protocolVersion,
+              t0,
+              t1,
+              t2,
+              t3,
+            ),
           );
           return;
         }
 
         this.completedResponses.add(responseKey);
-        const offset = (t1 - t0 + (t2 - t3)) / 2;
         this.onSample({
           sequence,
-          senderRole: requesterRole,
+          requesterRole,
+          responderRole,
           protocolVersion: msg.protocolVersion,
           t0,
           t1,
           t2,
           t3,
-          rttMs: rtt,
-          offsetMs: Number.isFinite(offset) ? offset : null,
+          rttMs: validation.rttMs,
+          offsetMs: validation.offsetMs,
           timeout: false,
           duplicate: false,
           unsolicited: false,
@@ -361,5 +423,8 @@ export function validLocalCompletedProbes(
   samples: ClockProbeSample[],
   localRole: PeerRole,
 ): ClockProbeSample[] {
-  return validCompletedProbes(samples).filter((s) => s.senderRole === localRole);
+  return validCompletedProbes(samples).filter(
+    (s) =>
+      s.requesterRole === localRole && s.responderRole === oppositeRole(localRole),
+  );
 }

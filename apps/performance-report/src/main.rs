@@ -197,7 +197,11 @@ fn pair_files(peer_a: &Path, peer_b: &Path, out_dir: &Path) {
         &artifacts.pair.pair_id,
         &artifacts.pair.session_correlation_id,
         &artifacts.pair.software_commit,
-    );
+    )
+    .unwrap_or_else(|e| {
+        eprintln!("manifest build error: {e}");
+        process::exit(1);
+    });
     fs::write(
         out_dir.join("artifact-manifest.json"),
         serde_json::to_string_pretty(&manifest).unwrap(),

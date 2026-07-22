@@ -4,10 +4,12 @@ import {
   ClockProbeEngine,
   computeClockMedian,
   MAX_PROBE_PAYLOAD_BYTES,
+  oppositeRole,
+  validateCrossDeviceClockTimestamps,
   validCompletedProbes,
   validLocalCompletedProbes,
 } from "./clock-probe";
-import { collectStatsPreflight } from "./stats-sampler";
+import { collectStatsPreflight, computeIntervalMetrics, deltaCumulativeMetric } from "./stats-sampler";
 import { LiveWebRtcSession } from "./session";
 import {
   applySignalingDescription,
@@ -16,18 +18,21 @@ import {
   IceCandidateBuffer,
 } from "./negotiation";
 import { StatsSampler } from "./stats-sampler";
+import { invalid, observedNumber, unsupported, unavailable } from "./types";
+
 import type { ClockProbeSample, PeerRole } from "./types";
 
 function probeSample(overrides: Partial<ClockProbeSample> = {}): ClockProbeSample {
   return {
     sequence: 0,
-    senderRole: "peer_a",
+    requesterRole: "peer_a",
+    responderRole: "peer_b",
     protocolVersion: CLOCK_PROBE_PROTOCOL_VERSION,
-    t0: 0,
-    t1: 1,
-    t2: 2,
-    t3: 10,
-    rttMs: 10,
+    t0: 1000,
+    t1: 1010,
+    t2: 1011,
+    t3: 1021,
+    rttMs: 20,
     offsetMs: 0,
     timeout: false,
     duplicate: false,
@@ -36,6 +41,180 @@ function probeSample(overrides: Partial<ClockProbeSample> = {}): ClockProbeSampl
     ...overrides,
   };
 }
+
+describe("cross-device clock semantics", () => {
+  it.each([
+    ["+500ms", 1000, 1600, 1601, 1021],
+    ["-500ms", 2000, 1400, 1401, 2021],
+    ["+5000ms", 1000, 6100, 6101, 1021],
+    ["-5000ms", 10000, 4500, 4501, 10021],
+  ])("accepts separate clock domains (%s)", (_label, t0, t1, t2, t3) => {
+    const result = validateCrossDeviceClockTimestamps(t0, t1, t2, t3);
+    expect(result.valid).toBe(true);
+    expect(result.rttMs).toBe(20);
+    expect(result.offsetMs).not.toBeNull();
+  });
+
+  it.each([
+    ["t3 < t0", 2000, 1500, 1501, 1000],
+    ["t2 < t1", 1000, 1200, 1100, 1021],
+    ["negative RTT", 1000, 1010, 1050, 1021],
+  ])("rejects invalid ordering (%s)", (_label, t0, t1, t2, t3) => {
+    expect(validateCrossDeviceClockTimestamps(t0, t1, t2, t3).valid).toBe(false);
+  });
+
+  it("rejects non-finite timestamps", () => {
+    expect(validateCrossDeviceClockTimestamps(Number.NaN, 1, 2, 3).valid).toBe(false);
+  });
+});
+
+describe("responder identity", () => {
+  it("requires opposite responder for valid local completed probes", () => {
+    const valid = probeSample({ requesterRole: "peer_a", responderRole: "peer_b" });
+    const wrong = probeSample({ requesterRole: "peer_a", responderRole: "peer_a" });
+    expect(validLocalCompletedProbes([valid], "peer_a")).toHaveLength(1);
+    expect(validLocalCompletedProbes([wrong], "peer_a")).toHaveLength(0);
+  });
+
+  it("preserves responder identity on duplicate responses", async () => {
+    const { samplesA, dcA } = attachEnginesForDuplicateTest();
+    await flushAsync();
+    const completed = samplesA.find((s) => s.rttMs !== null);
+    expect(completed?.responderRole).toBe("peer_b");
+    dcA.onmessage?.({
+      data: JSON.stringify({
+        type: "clock_probe_response",
+        protocolVersion: CLOCK_PROBE_PROTOCOL_VERSION,
+        sequence: completed!.sequence,
+        requesterRole: "peer_a",
+        responderRole: "peer_b",
+        t0: completed!.t0,
+        t1: completed!.t1,
+        t2: completed!.t2,
+      }),
+    });
+    expect(samplesA.some((s) => s.duplicate && s.responderRole === "peer_b")).toBe(true);
+  });
+
+  function attachEnginesForDuplicateTest() {
+    const [dcA, dcB] = linkedChannels();
+    const samplesA: ClockProbeSample[] = [];
+    const engineA = new ClockProbeEngine("peer_a", (sample) => samplesA.push(sample));
+    const engineB = new ClockProbeEngine("peer_b", () => {});
+    engineA.attach(dcA as unknown as RTCDataChannel);
+    engineB.attach(dcB as unknown as RTCDataChannel);
+    engineA.start({ intervalMs: 1000, count: 1 });
+    engineB.start({ intervalMs: 1000, count: 0 });
+    return { samplesA, dcA };
+  }
+
+  async function flushAsync(): Promise<void> {
+    await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
+
+  class FakeDataChannel {
+    readyState: RTCDataChannelState = "open";
+    onmessage: ((event: { data: string }) => void) | null = null;
+    peer: FakeDataChannel | null = null;
+    send(data: string): void {
+      queueMicrotask(() => this.peer?.onmessage?.({ data }));
+    }
+  }
+
+  function linkedChannels(): [FakeDataChannel, FakeDataChannel] {
+    const a = new FakeDataChannel();
+    const b = new FakeDataChannel();
+    a.peer = b;
+    b.peer = a;
+    return [a, b];
+  }
+});
+
+describe("stats interval metrics", () => {
+  const baseSample = (bytes: number, offsetMs: number) => ({
+    offsetMs,
+    candidatePair: {},
+    inboundAudio: { bytesReceived: observedNumber(bytes), packetsLost: observedNumber(0) },
+    outboundAudio: { bytesSent: observedNumber(bytes) },
+    remoteInboundAudio: {},
+    codec: {},
+  });
+
+  it("computes normal positive delta", () => {
+    const metrics = computeIntervalMetrics(baseSample(100, 0), baseSample(200, 1000));
+    expect(metrics.receiveBitrateBps).toEqual({ kind: "observed_number", value: 800 });
+  });
+
+  it("accepts zero delta", () => {
+    expect(deltaCumulativeMetric(observedNumber(5), observedNumber(5))).toEqual(observedNumber(0));
+  });
+
+  it("classifies counter reset", () => {
+    expect(deltaCumulativeMetric(observedNumber(10), observedNumber(3))).toEqual(
+      invalid("counter_reset"),
+    );
+  });
+
+  it("returns unavailable for missing previous value", () => {
+    expect(deltaCumulativeMetric(unsupported(), observedNumber(1))).toEqual(unsupported());
+  });
+
+  it("returns invalid for wrong metric type", () => {
+    expect(deltaCumulativeMetric(observedNumber(1), invalid("x"))).toEqual(
+      invalid("expected observed_number"),
+    );
+  });
+});
+
+describe("data channel lifecycle evidence", () => {
+  it("records closed state in finalized export", () => {
+    const { session } = makeSession();
+    const internal = session as unknown as {
+      phase: string;
+      observationStartedAt: string;
+      observationCompletedAt: string;
+      clockSamples: ClockProbeSample[];
+      statsSamples: unknown[];
+      dataChannelProps: Record<string, unknown>;
+      exportFinalizedEndpoint: () => Record<string, unknown>;
+    };
+    internal.phase = "completed";
+    internal.observationStartedAt = "2026-07-21T09:00:00.000Z";
+    internal.observationCompletedAt = "2026-07-21T09:01:00.000Z";
+    internal.clockSamples = Array.from({ length: 10 }, (_, i) =>
+      probeSample({ sequence: i, requesterRole: "peer_a", responderRole: "peer_b" }),
+    );
+    internal.statsSamples = Array.from({ length: 30 }, () => ({}));
+    internal.dataChannelProps = { readyState: "closed" };
+    const exported = internal.exportFinalizedEndpoint();
+    expect(exported.dataChannel).toMatchObject({ readyState: "closed" });
+  });
+
+  function makeSession(role: PeerRole = "peer_a") {
+    const session = new LiveWebRtcSession(
+      {
+        sessionCorrelationId: "0123456789abcdef0123456789abcdef",
+        localPeerId: role,
+        softwareCommit: "e4198657264a6b4629948469dcdabde21a3eaa34",
+      },
+      {
+        onPhaseChange: vi.fn(),
+        onSignalingState: vi.fn(),
+        onConnectionState: vi.fn(),
+        onIceState: vi.fn(),
+        onDataChannelState: vi.fn(),
+        onRemoteStream: vi.fn(),
+        onMicrophoneState: vi.fn(),
+        onNegotiation: vi.fn(),
+        onClockProbe: vi.fn(),
+        onStatsSample: vi.fn(),
+        onError: vi.fn(),
+      },
+    );
+    return { session };
+  }
+});
 
 describe("clock probe formulas", () => {
   it("computes RTT and offset from four timestamps", () => {
@@ -371,7 +550,7 @@ describe("session ready gate and export", () => {
     internal.remoteStream = {
       getAudioTracks: () => [{ readyState: "live" }],
     } as MediaStream;
-    internal.clockSamples = [probeSample({ senderRole: "peer_a" })];
+    internal.clockSamples = [probeSample({ requesterRole: "peer_a", responderRole: "peer_b" })];
     internal.statsPreflightComplete = true;
     expect(internal.collectReadyFailures()).toEqual([]);
   });
@@ -399,7 +578,7 @@ describe("session ready gate and export", () => {
     internal.remoteStream = {
       getAudioTracks: () => [{ readyState: "live" }],
     } as MediaStream;
-    internal.clockSamples = [probeSample({ senderRole: "peer_a" })];
+    internal.clockSamples = [probeSample({ requesterRole: "peer_a", responderRole: "peer_b" })];
     internal.statsPreflightComplete = false;
     expect(internal.collectReadyFailures()).toContain("stats preflight incomplete");
   });
@@ -419,7 +598,7 @@ describe("session ready gate and export", () => {
     internal.observationStartedAt = "2026-07-21T09:00:00.000Z";
     internal.observationCompletedAt = "2026-07-21T09:01:00.000Z";
     internal.clockSamples = Array.from({ length: 10 }, (_, i) =>
-      probeSample({ sequence: i, senderRole: "peer_a" }),
+      probeSample({ sequence: i, requesterRole: "peer_a", responderRole: "peer_b" }),
     );
     internal.statsSamples = Array.from({ length: 30 }, () => ({}));
     const finalized = internal.exportFinalizedEndpoint();

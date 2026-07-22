@@ -1,0 +1,151 @@
+{
+  "schemaVersion": "echlub.performance.live-observation-pair/v1",
+  "pairId": "pair-0123456789abcdef",
+  "sessionCorrelationId": "0123456789abcdef0123456789abcdef",
+  "softwareCommit": "e4198657264a6b4629948469dcdabde21a3eaa34",
+  "endpointRunIds": [
+    "live-finalized-peer-a",
+    "live-finalized-peer-b"
+  ],
+  "observationOverlapSeconds": 60.0,
+  "perEndpointSummaries": {
+    "peerA": {
+      "candidatePairRttMadMs": {
+        "kind": "observed_number",
+        "value": 0.0
+      },
+      "clockOffsetMadMs": {
+        "kind": "observed_number",
+        "value": 0.0
+      },
+      "clockProbeRttMadMs": {
+        "kind": "observed_number",
+        "value": 0.0
+      },
+      "concealmentRatioAvg": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "insertedSampleRatioAvg": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalJitterBufferDelayAvgMs": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalJitterBufferMinimumDelayAvgMs": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalJitterBufferTargetDelayAvgMs": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalPacketLossDeltaAvg": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalReceiveBitrateAvgBps": {
+        "kind": "observed_number",
+        "value": 2000.0
+      },
+      "intervalSendBitrateAvgBps": {
+        "kind": "observed_number",
+        "value": 1200.0
+      },
+      "medianCandidatePairRttMs": {
+        "kind": "observed_number",
+        "value": 20.0
+      },
+      "medianClockOffsetMs": {
+        "kind": "observed_number",
+        "value": 0.0
+      },
+      "medianClockProbeRttMs": {
+        "kind": "observed_number",
+        "value": 20.0
+      },
+      "removedSampleRatioAvg": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      }
+    },
+    "peerB": {
+      "candidatePairRttMadMs": {
+        "kind": "observed_number",
+        "value": 0.0
+      },
+      "clockOffsetMadMs": {
+        "kind": "observed_number",
+        "value": 0.0
+      },
+      "clockProbeRttMadMs": {
+        "kind": "observed_number",
+        "value": 0.0
+      },
+      "concealmentRatioAvg": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "insertedSampleRatioAvg": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalJitterBufferDelayAvgMs": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalJitterBufferMinimumDelayAvgMs": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalJitterBufferTargetDelayAvgMs": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalPacketLossDeltaAvg": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      },
+      "intervalReceiveBitrateAvgBps": {
+        "kind": "observed_number",
+        "value": 2000.0
+      },
+      "intervalSendBitrateAvgBps": {
+        "kind": "observed_number",
+        "value": 1200.0
+      },
+      "medianCandidatePairRttMs": {
+        "kind": "observed_number",
+        "value": 20.0
+      },
+      "medianClockOffsetMs": {
+        "kind": "observed_number",
+        "value": 0.0
+      },
+      "medianClockProbeRttMs": {
+        "kind": "observed_number",
+        "value": 20.0
+      },
+      "removedSampleRatioAvg": {
+        "kind": "unavailable",
+        "reason": "insufficient interval samples"
+      }
+    }
+  },
+  "consistencyChecks": {
+    "bothConnected": true,
+    "bothRemoteAudio": true,
+    "overlappingObservation": true,
+    "sameCorrelationId": true,
+    "sameSoftwareCommit": true
+  },
+  "limitations": [
+    "Exploratory non-authoritative two-peer browser observation.",
+    "Not an acoustic mouth-to-ear measurement.",
+    "Clock offset is an estimate affected by route asymmetry and scheduling.",
+    "No measured one-way network latency.",
+    "No transport selection result."
+  ]
+}

@@ -29,11 +29,6 @@
       "filename": "pair-summary.json",
       "checksum": "94023386d0aa682a8663ac4929601b95a61d5bf08e4c31a7b58eed50a03320b1",
       "artifactRole": "live-observation-pair-summary"
-    },
-    {
-      "filename": "report.md",
-      "checksum": "53fb3ef87add2a8b2d9e858b3f73b766dc31e1c2ef09bb6aff98aeb3c1f10cb6",
-      "artifactRole": "live-pair-report"
     }
   ]
 }

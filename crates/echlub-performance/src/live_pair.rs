@@ -1,10 +1,8 @@
 use crate::live_derived::compute_live_endpoint_derived;
 use crate::live_schema::{
-    LiveArtifactManifestEntryV1, LiveArtifactManifestV1, LiveObservationPairV1,
-    ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_A, ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_B,
-    ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_A, ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_B,
-    ARTIFACT_ROLE_PAIR_REPORT, ARTIFACT_ROLE_PAIR_SUMMARY, CHECKSUM_ALGORITHM,
-    LIVE_MANIFEST_SCHEMA_VERSION, LIVE_PAIR_SCHEMA_VERSION,
+    required_live_artifact_spec, LiveArtifactManifestEntryV1, LiveArtifactManifestV1,
+    LiveObservationPairV1, CHECKSUM_ALGORITHM, LIVE_MANIFEST_SCHEMA_VERSION,
+    LIVE_PAIR_SCHEMA_VERSION,
 };
 use crate::live_validate::{
     checksum_bytes, count_valid_local_probes, parse_and_validate_live_endpoint,
@@ -216,47 +214,46 @@ pub fn pair_live_endpoints(
     })
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ManifestBuildError {
+    #[error("missing required artifact file: {0}")]
+    MissingFile(String),
+    #[error("unsafe manifest filename: {0}")]
+    UnsafeFilename(String),
+}
+
 pub fn build_manifest_entries(
     dir: &std::path::Path,
     pair_id: &str,
     corr: &str,
     commit: &str,
-) -> LiveArtifactManifestV1 {
-    let files = [
-        (
-            "peer-a.validated.json",
-            ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_A,
-        ),
-        (
-            "peer-b.validated.json",
-            ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_B,
-        ),
-        ("peer-a.summary.json", ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_A),
-        ("peer-b.summary.json", ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_B),
-        ("pair-summary.json", ARTIFACT_ROLE_PAIR_SUMMARY),
-        ("report.md", ARTIFACT_ROLE_PAIR_REPORT),
-    ];
+) -> Result<LiveArtifactManifestV1, ManifestBuildError> {
+    let mut artifacts = Vec::with_capacity(required_live_artifact_spec().len());
 
-    let artifacts = files
-        .iter()
-        .map(|(filename, role)| {
-            let bytes = std::fs::read(dir.join(filename)).unwrap_or_default();
-            LiveArtifactManifestEntryV1 {
-                filename: (*filename).to_string(),
-                checksum: checksum_bytes(&bytes),
-                artifact_role: (*role).to_string(),
-            }
-        })
-        .collect();
+    for (filename, role) in required_live_artifact_spec() {
+        if let Some(reason) = crate::live_validate::validate_manifest_filename(filename) {
+            return Err(ManifestBuildError::UnsafeFilename(format!(
+                "{filename}: {reason}"
+            )));
+        }
+        let path = dir.join(filename);
+        let bytes = std::fs::read(&path)
+            .map_err(|_| ManifestBuildError::MissingFile(filename.to_string()))?;
+        artifacts.push(LiveArtifactManifestEntryV1 {
+            filename: (*filename).to_string(),
+            checksum: checksum_bytes(&bytes),
+            artifact_role: (*role).to_string(),
+        });
+    }
 
-    LiveArtifactManifestV1 {
+    Ok(LiveArtifactManifestV1 {
         schema_version: LIVE_MANIFEST_SCHEMA_VERSION.to_string(),
         algorithm: CHECKSUM_ALGORITHM.to_string(),
         pair_id: pair_id.to_string(),
         session_correlation_id: corr.to_string(),
         software_commit: commit.to_string(),
         artifacts,
-    }
+    })
 }
 
 fn compute_overlap_seconds(a: &Value, b: &Value) -> f64 {

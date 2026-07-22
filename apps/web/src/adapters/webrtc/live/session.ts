@@ -361,9 +361,10 @@ export class LiveWebRtcSession {
       ordered: channel.ordered,
       maxRetransmits: channel.maxRetransmits,
       negotiated: channel.negotiated,
+      readyState: channel.readyState,
     };
     channel.onopen = () => {
-      this.dataChannelProps.readyState = channel.readyState;
+      this.setDataChannelReadyState(channel.readyState);
       this.callbacks.onDataChannelState(channel.readyState);
       this.clockEngine = new ClockProbeEngine(this.config.localPeerId, (sample) => {
         this.clockSamples.push(sample);
@@ -373,9 +374,20 @@ export class LiveWebRtcSession {
       this.clockEngine.attach(channel);
       this.clockEngine.start({ intervalMs: 500, count: 3 });
     };
+    channel.onclosing = () => {
+      this.setDataChannelReadyState("closing");
+    };
     channel.onclose = () => {
+      this.setDataChannelReadyState("closed");
       this.callbacks.onDataChannelState("closed");
     };
+    channel.onerror = () => {
+      this.setDataChannelReadyState("closed");
+    };
+  }
+
+  private setDataChannelReadyState(state: RTCDataChannelState | "closing"): void {
+    this.dataChannelProps.readyState = state;
   }
 
   private async handleSignaling(payload: unknown): Promise<void> {

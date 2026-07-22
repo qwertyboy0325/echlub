@@ -1,6 +1,7 @@
 use echlub_performance::{
-    pair_live_endpoints, validate_live_endpoint, verify_live_artifact_manifest,
-    LiveValidationError, LIVE_SCHEMA_VERSION,
+    build_manifest_entries, pair_live_endpoints, validate_cross_device_clock_timestamps,
+    validate_live_endpoint, verify_live_artifact_manifest, LiveValidationError,
+    LIVE_SCHEMA_VERSION,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -28,6 +29,55 @@ fn finalized_positive_fixture_passes() {
     let json = read_vector("live-endpoint-finalized-peer-a-v1.json");
     let result = validate_live_endpoint(&json, true);
     assert!(result.valid, "errors: {:?}", result.errors);
+}
+
+#[test]
+fn cross_clock_plus_500_fixture_passes() {
+    let json = read_vector("live-endpoint-cross-clock-plus-500-v1.json");
+    let result = validate_live_endpoint(&json, true);
+    assert!(result.valid, "errors: {:?}", result.errors);
+}
+
+#[test]
+fn cross_clock_minus_500_fixture_passes() {
+    let json = read_vector("live-endpoint-cross-clock-minus-500-v1.json");
+    let result = validate_live_endpoint(&json, true);
+    assert!(result.valid, "errors: {:?}", result.errors);
+}
+
+#[test]
+fn cross_clock_rust_validator_accepts_separate_domains() {
+    assert_eq!(
+        validate_cross_device_clock_timestamps(1000.0, 1600.0, 1601.0, 1021.0),
+        Some(20.0)
+    );
+    assert_eq!(
+        validate_cross_device_clock_timestamps(2000.0, 1400.0, 1401.0, 2021.0),
+        Some(20.0)
+    );
+    assert!(validate_cross_device_clock_timestamps(2000.0, 1500.0, 1501.0, 1000.0).is_none());
+}
+
+#[test]
+fn rejects_missing_responder_fixture() {
+    let json = read_vector("live-endpoint-missing-responder-v1.json");
+    let result = validate_live_endpoint(&json, true);
+    assert!(!result.valid);
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, LiveValidationError::InvalidResponderRole(_))));
+}
+
+#[test]
+fn rejects_datachannel_closed_fixture() {
+    let json = read_vector("live-endpoint-datachannel-closed-v1.json");
+    let result = validate_live_endpoint(&json, true);
+    assert!(!result.valid);
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, LiveValidationError::DataChannelNotOpen)));
 }
 
 #[test]
@@ -68,6 +118,42 @@ fn live_directory_manifest_verification_passes() {
     let dir = vector_path("live-directory-v1");
     let result = verify_live_artifact_manifest(&dir);
     assert!(result.valid, "errors: {:?}", result.errors);
+}
+
+#[test]
+fn rejects_empty_manifest_fixture() {
+    let dir = vector_path("live-directory-empty-manifest-v1");
+    let result = verify_live_artifact_manifest(&dir);
+    assert!(!result.valid);
+}
+
+#[test]
+fn rejects_missing_manifest_entry_fixture() {
+    let dir = vector_path("live-directory-missing-entry-v1");
+    let result = verify_live_artifact_manifest(&dir);
+    assert!(!result.valid);
+}
+
+#[test]
+fn rejects_path_traversal_manifest_fixture() {
+    let dir = vector_path("live-directory-path-traversal-v1");
+    let result = verify_live_artifact_manifest(&dir);
+    assert!(!result.valid);
+}
+
+#[test]
+fn build_manifest_entries_fails_for_missing_file() {
+    let temp = std::env::temp_dir().join("echlub-manifest-missing-file");
+    let _ = fs::remove_dir_all(&temp);
+    fs::create_dir_all(&temp).unwrap();
+    let result = build_manifest_entries(
+        &temp,
+        "pair-test",
+        "0123456789abcdef0123456789abcdef",
+        "e4198657264a6b4629948469dcdabde21a3eaa34",
+    );
+    let _ = fs::remove_dir_all(&temp);
+    assert!(result.is_err());
 }
 
 #[test]

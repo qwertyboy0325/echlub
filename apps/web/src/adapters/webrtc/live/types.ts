@@ -36,7 +36,8 @@ export type MetricValue =
 
 export interface ClockProbeSample {
   sequence: number;
-  senderRole: PeerRole;
+  requesterRole: PeerRole;
+  responderRole: PeerRole | null;
   protocolVersion: number;
   t0: number;
   t1: number | null;

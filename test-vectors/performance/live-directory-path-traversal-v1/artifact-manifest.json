@@ -34,6 +34,11 @@
       "filename": "report.md",
       "checksum": "53fb3ef87add2a8b2d9e858b3f73b766dc31e1c2ef09bb6aff98aeb3c1f10cb6",
       "artifactRole": "live-pair-report"
+    },
+    {
+      "filename": "../report.md",
+      "checksum": "deadbeef",
+      "artifactRole": "live-pair-report"
     }
   ]
 }

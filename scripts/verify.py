@@ -187,6 +187,90 @@ def main() -> int:
                     "test-vectors/performance/live-directory-v1",
                 ],
             ),
+            (
+                "live cross-clock +500 fixture",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-cross-clock-plus-500-v1.json",
+                ],
+            ),
+            (
+                "live cross-clock -500 fixture",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-cross-clock-minus-500-v1.json",
+                ],
+            ),
+            (
+                "live missing responder fixture reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-missing-responder-v1.json",
+                ],
+            ),
+            (
+                "live datachannel closed fixture reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "validate-live-endpoint",
+                    "test-vectors/performance/live-endpoint-datachannel-closed-v1.json",
+                ],
+            ),
+            (
+                "live empty manifest reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "verify-live-directory",
+                    "test-vectors/performance/live-directory-empty-manifest-v1",
+                ],
+            ),
+            (
+                "live missing manifest entry reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "verify-live-directory",
+                    "test-vectors/performance/live-directory-missing-entry-v1",
+                ],
+            ),
+            (
+                "live path traversal manifest reject",
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "echlub-performance-report",
+                    "--",
+                    "verify-live-directory",
+                    "test-vectors/performance/live-directory-path-traversal-v1",
+                ],
+            ),
         ]
     )
 
@@ -195,6 +279,11 @@ def main() -> int:
         "live invalid clock-only fixture reject",
         "live timestamp reversal fixture reject",
         "live draft-as-final reject",
+        "live missing responder fixture reject",
+        "live datachannel closed fixture reject",
+        "live empty manifest reject",
+        "live missing manifest entry reject",
+        "live path traversal manifest reject",
     }
 
     if not args.skip_references:

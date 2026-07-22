@@ -122,7 +122,7 @@ export async function collectNormalizedStats(
         packetsLost: metricNumberFromReport(report, "packetsLost"),
         jitter: metricNumberFromReport(report, "jitter"),
         jitterBufferDelay: metricNumberFromReport(report, "jitterBufferDelay"),
-        jitterBufferTargetDelay: metricNumberFromReport(report, "jitterBufferDelay"),
+        jitterBufferTargetDelay: metricNumberFromReport(report, "jitterBufferTargetDelay"),
         jitterBufferMinimumDelay: metricNumberFromReport(report, "jitterBufferMinimumDelay"),
         bytesReceived: metricNumberFromReport(report, "bytesReceived"),
         concealedSamples: metricNumberFromReport(report, "concealedSamples"),
@@ -177,7 +177,30 @@ export async function collectStatsPreflight(
   return collectNormalizedStats(pc, 0, null);
 }
 
-function computeIntervalMetrics(
+export function deltaCumulativeMetric(prev: MetricValue, curr: MetricValue): MetricValue {
+  if (prev.kind === "invalid" || curr.kind === "invalid") {
+    return invalid("expected observed_number");
+  }
+  if (prev.kind === "unsupported" || curr.kind === "unsupported") {
+    return unsupported();
+  }
+  if (prev.kind === "unavailable") {
+    return unavailable("missing previous value");
+  }
+  if (curr.kind === "unavailable") {
+    return unavailable("missing current value");
+  }
+  if (!isObservedNumber(prev) || !isObservedNumber(curr)) {
+    return invalid("expected observed_number");
+  }
+  const delta = curr.value - prev.value;
+  if (delta < 0) {
+    return invalid("counter_reset");
+  }
+  return observedNumber(delta);
+}
+
+export function computeIntervalMetrics(
   prev: NormalizedStatsSample,
   curr: NormalizedStatsSample,
 ): Record<string, MetricValue> {
@@ -185,28 +208,37 @@ function computeIntervalMetrics(
   if (dt <= 0) return {};
   const metrics: Record<string, MetricValue> = {};
   const rtt = curr.candidatePair.currentRoundTripTime;
-  if (isObservedNumber(rtt)) {
+  if (rtt !== undefined && isObservedNumber(rtt)) {
     metrics.candidatePairRttMs = observedNumber(rtt.value * 1000);
   }
-  const recvDelta = deltaMetric(prev.inboundAudio.bytesReceived, curr.inboundAudio.bytesReceived);
-  if (recvDelta !== null) {
-    metrics.receiveBitrateBps = observedNumber((recvDelta * 8 * 1000) / dt);
+  const recvDelta = deltaCumulativeMetric(
+    prev.inboundAudio.bytesReceived ?? unsupported(),
+    curr.inboundAudio.bytesReceived ?? unsupported(),
+  );
+  if (recvDelta.kind === "observed_number") {
+    metrics.receiveBitrateBps = observedNumber((recvDelta.value * 8 * 1000) / dt);
+  } else if (recvDelta.kind === "invalid" && recvDelta.reason === "counter_reset") {
+    metrics.receiveBitrateBps = recvDelta;
   }
-  const sendDelta = deltaMetric(prev.outboundAudio.bytesSent, curr.outboundAudio.bytesSent);
-  if (sendDelta !== null) {
-    metrics.sendBitrateBps = observedNumber((sendDelta * 8 * 1000) / dt);
+  const sendDelta = deltaCumulativeMetric(
+    prev.outboundAudio.bytesSent ?? unsupported(),
+    curr.outboundAudio.bytesSent ?? unsupported(),
+  );
+  if (sendDelta.kind === "observed_number") {
+    metrics.sendBitrateBps = observedNumber((sendDelta.value * 8 * 1000) / dt);
+  } else if (sendDelta.kind === "invalid" && sendDelta.reason === "counter_reset") {
+    metrics.sendBitrateBps = sendDelta;
   }
-  const lossDelta = deltaMetric(prev.inboundAudio.packetsLost, curr.inboundAudio.packetsLost);
-  if (lossDelta !== null) {
-    metrics.packetLossDelta = observedNumber(lossDelta);
+  const lossDelta = deltaCumulativeMetric(
+    prev.inboundAudio.packetsLost ?? unsupported(),
+    curr.inboundAudio.packetsLost ?? unsupported(),
+  );
+  if (lossDelta.kind === "observed_number") {
+    metrics.packetLossDelta = lossDelta;
+  } else if (lossDelta.kind === "invalid" && lossDelta.reason === "counter_reset") {
+    metrics.packetLossDelta = lossDelta;
   }
   return metrics;
-}
-
-function deltaMetric(prev: MetricValue, curr: MetricValue): number | null {
-  if (!isObservedNumber(prev) || !isObservedNumber(curr)) return null;
-  const delta = curr.value - prev.value;
-  return delta >= 0 ? delta : null;
 }
 
 export class StatsSampler {

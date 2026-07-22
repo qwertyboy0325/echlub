@@ -1,8 +1,12 @@
 use crate::live_derived::compute_live_endpoint_derived;
 use crate::live_privacy::{contains_live_forbidden_content, scan_live_value_for_forbidden_keys};
 use crate::live_schema::{
-    LiveEndpointObservationV1, LiveMetricValue, CHECKSUM_ALGORITHM, CLOCK_PROBE_PROTOCOL_VERSION,
-    LIVE_MANIFEST_SCHEMA_VERSION, LIVE_SCHEMA_VERSION,
+    required_live_artifact_spec, LiveEndpointObservationV1, LiveMetricValue,
+    ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_A, ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_B,
+    ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_A, ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_B,
+    ARTIFACT_ROLE_PAIR_REPORT, ARTIFACT_ROLE_PAIR_SUMMARY, CHECKSUM_ALGORITHM,
+    CLOCK_PROBE_PROTOCOL_VERSION, LIVE_MANIFEST_SCHEMA_VERSION, LIVE_PAIR_REPORT_DISCLAIMER_PREFIX,
+    LIVE_PAIR_SCHEMA_VERSION, LIVE_SCHEMA_VERSION,
 };
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -49,6 +53,8 @@ pub enum LiveValidationError {
     StatsOffsetsOutOfBounds,
     #[error("invalid clock probe sample")]
     InvalidClockProbe,
+    #[error("invalid responder role: {0}")]
+    InvalidResponderRole(String),
     #[error("missing limitations")]
     MissingLimitations,
     #[error("connection not connected")]
@@ -195,13 +201,50 @@ pub fn count_valid_local_probes(value: &Value) -> usize {
         .count()
 }
 
-fn is_valid_completed_local_probe(sample: &Value, peer_role: &str) -> bool {
-    let requester = sample
-        .get("senderRole")
-        .or_else(|| sample.get("requesterRole"))
+fn opposite_peer_role(role: &str) -> Option<&'static str> {
+    match role {
+        "peer_a" => Some("peer_b"),
+        "peer_b" => Some("peer_a"),
+        _ => None,
+    }
+}
+
+pub fn validate_cross_device_clock_timestamps(t0: f64, t1: f64, t2: f64, t3: f64) -> Option<f64> {
+    if !t0.is_finite() || !t1.is_finite() || !t2.is_finite() || !t3.is_finite() {
+        return None;
+    }
+    if t3 < t0 || t2 < t1 {
+        return None;
+    }
+    let remote_processing_duration = t2 - t1;
+    let local_round_trip_duration = t3 - t0;
+    if remote_processing_duration < 0.0 || local_round_trip_duration < 0.0 {
+        return None;
+    }
+    let rtt = local_round_trip_duration - remote_processing_duration;
+    if !rtt.is_finite() || rtt < 0.0 {
+        return None;
+    }
+    Some(rtt)
+}
+
+fn probe_requester_role(sample: &Value) -> Option<&str> {
+    sample
+        .get("requesterRole")
         .or_else(|| sample.get("requester_role"))
-        .and_then(|v| v.as_str());
-    if requester != Some(peer_role) {
+        .or_else(|| sample.get("senderRole"))
+        .and_then(|v| v.as_str())
+}
+
+fn probe_responder_role(sample: &Value) -> Option<&str> {
+    sample
+        .get("responderRole")
+        .or_else(|| sample.get("responder_role"))
+        .and_then(|v| v.as_str())
+}
+
+fn is_valid_completed_local_probe(sample: &Value, peer_role: &str) -> bool {
+    if probe_requester_role(sample) != Some(peer_role) {
         return false;
     }
     if sample.get("timeout").and_then(|v| v.as_bool()) != Some(false) {
@@ -223,6 +266,13 @@ fn is_valid_completed_local_probe(sample: &Value, peer_role: &str) -> bool {
     if protocol != Some(CLOCK_PROBE_PROTOCOL_VERSION) {
         return false;
     }
+    let expected_responder = match opposite_peer_role(peer_role) {
+        Some(role) => role,
+        None => return false,
+    };
+    if probe_responder_role(sample) != Some(expected_responder) {
+        return false;
+    }
     let rtt = sample.get("rttMs").or_else(|| sample.get("rtt_ms"));
     if !rtt.map(|v| v.is_number()).unwrap_or(false) {
         return false;
@@ -232,17 +282,8 @@ fn is_valid_completed_local_probe(sample: &Value, peer_role: &str) -> bool {
     let t2 = sample.get("t2").and_then(|v| v.as_f64());
     let t3 = sample.get("t3").and_then(|v| v.as_f64());
     match (t0, t1, t2, t3) {
-        (Some(t0), Some(t1), Some(t2), Some(t3))
-            if t0.is_finite() && t1.is_finite() && t2.is_finite() && t3.is_finite() =>
-        {
-            if !(t0 <= t1 && t1 <= t2 && t2 <= t3) {
-                return false;
-            }
-            let rtt_val = rtt.and_then(|v| v.as_f64()).unwrap_or(f64::NAN);
-            if !rtt_val.is_finite() || rtt_val < 0.0 {
-                return false;
-            }
-            true
+        (Some(t0), Some(t1), Some(t2), Some(t3)) => {
+            validate_cross_device_clock_timestamps(t0, t1, t2, t3).is_some()
         }
         _ => false,
     }
@@ -366,6 +407,7 @@ fn validate_clock_probe_samples(value: &Value, errors: &mut Vec<LiveValidationEr
         .or_else(|| value.get("peer_role"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
+    let expected_responder = opposite_peer_role(peer_role);
     let samples = value
         .pointer("/clockProbes/samples")
         .or_else(|| value.pointer("/clock_probes/samples"))
@@ -375,15 +417,44 @@ fn validate_clock_probe_samples(value: &Value, errors: &mut Vec<LiveValidationEr
         return;
     };
     for sample in samples {
-        let requester = sample
-            .get("senderRole")
-            .or_else(|| sample.get("requesterRole"))
-            .and_then(|v| v.as_str());
+        let requester = probe_requester_role(sample);
+        let is_completed = sample.get("timeout").and_then(|v| v.as_bool()) == Some(false)
+            && sample.get("duplicate").and_then(|v| v.as_bool()) == Some(false)
+            && sample.get("unsolicited").and_then(|v| v.as_bool()) == Some(false)
+            && sample.get("invalid").and_then(|v| v.as_bool()) == Some(false)
+            && sample
+                .get("rttMs")
+                .or_else(|| sample.get("rtt_ms"))
+                .is_some();
+        if !is_completed {
+            continue;
+        }
+        if requester == Some(peer_role) {
+            let responder = probe_responder_role(sample);
+            if responder.is_none() {
+                errors.push(LiveValidationError::InvalidResponderRole(
+                    "missing responderRole".into(),
+                ));
+                return;
+            }
+            if responder == requester {
+                errors.push(LiveValidationError::InvalidResponderRole(
+                    "responder equals requester".into(),
+                ));
+                return;
+            }
+            if expected_responder.is_some() && responder != expected_responder {
+                errors.push(LiveValidationError::InvalidResponderRole(
+                    responder.unwrap_or("unknown").into(),
+                ));
+                return;
+            }
+        }
         if requester == Some(peer_role)
             && sample.get("invalid").and_then(|v| v.as_bool()) == Some(true)
         {
             errors.push(LiveValidationError::InvalidClockProbe);
-            break;
+            return;
         }
     }
 }
@@ -548,7 +619,17 @@ pub fn verify_live_artifact_manifest(dir: &std::path::Path) -> LiveValidationRes
         )]);
     };
 
+    if artifacts.is_empty() {
+        return LiveValidationResult::err(vec![LiveValidationError::ManifestVerification(
+            "empty artifacts array".into(),
+        )]);
+    }
+
     let mut errors = Vec::new();
+    let mut seen_filenames = std::collections::HashSet::new();
+    let mut seen_roles = std::collections::HashSet::new();
+    let mut manifest_entries = std::collections::HashMap::new();
+
     for entry in artifacts {
         let filename = entry.get("filename").and_then(|v| v.as_str());
         let expected = entry.get("checksum").and_then(|v| v.as_str());
@@ -560,7 +641,34 @@ pub fn verify_live_artifact_manifest(dir: &std::path::Path) -> LiveValidationRes
             continue;
         };
 
+        if let Some(reason) = validate_manifest_filename(filename) {
+            errors.push(LiveValidationError::ManifestVerification(format!(
+                "{filename}: {reason}"
+            )));
+            continue;
+        }
+
+        if !seen_filenames.insert(filename.to_string()) {
+            errors.push(LiveValidationError::ManifestVerification(format!(
+                "duplicate filename: {filename}"
+            )));
+        }
+        if !seen_roles.insert(role.to_string()) {
+            errors.push(LiveValidationError::ManifestVerification(format!(
+                "duplicate artifactRole: {role}"
+            )));
+        }
+
+        manifest_entries.insert(filename.to_string(), role.to_string());
+
         let path = dir.join(filename);
+        if !path.starts_with(dir) {
+            errors.push(LiveValidationError::ManifestVerification(format!(
+                "manifest entry escapes evidence directory: {filename}"
+            )));
+            continue;
+        }
+
         let bytes = match std::fs::read(&path) {
             Ok(b) => b,
             Err(e) => {
@@ -575,14 +683,73 @@ pub fn verify_live_artifact_manifest(dir: &std::path::Path) -> LiveValidationRes
             errors.push(LiveValidationError::ChecksumMismatch(filename.to_string()));
         }
 
-        if role.ends_with("validated-peer-a") || role.ends_with("validated-peer-b") {
-            let json = String::from_utf8_lossy(&bytes);
-            let result = validate_live_endpoint(&json, true);
-            if !result.valid {
-                errors.extend(result.errors.into_iter().map(|e| {
-                    LiveValidationError::ManifestVerification(format!("{filename}: {e}"))
-                }));
+        match role {
+            ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_A | ARTIFACT_ROLE_ENDPOINT_VALIDATED_PEER_B => {
+                let json = String::from_utf8_lossy(&bytes);
+                let result = validate_live_endpoint(&json, true);
+                if !result.valid {
+                    errors.extend(result.errors.into_iter().map(|e| {
+                        LiveValidationError::ManifestVerification(format!("{filename}: {e}"))
+                    }));
+                }
             }
+            ARTIFACT_ROLE_PAIR_SUMMARY => {
+                let parsed: Result<Value, _> = serde_json::from_slice(&bytes);
+                match parsed {
+                    Ok(value) => {
+                        let pair_schema = value.get("schemaVersion").and_then(|v| v.as_str());
+                        if pair_schema != Some(LIVE_PAIR_SCHEMA_VERSION) {
+                            errors.push(LiveValidationError::ManifestVerification(format!(
+                                "{filename}: pair schema mismatch"
+                            )));
+                        }
+                    }
+                    Err(e) => errors.push(LiveValidationError::ManifestVerification(format!(
+                        "{filename}: invalid JSON: {e}"
+                    ))),
+                }
+            }
+            ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_A | ARTIFACT_ROLE_ENDPOINT_SUMMARY_PEER_B => {
+                if serde_json::from_slice::<Value>(&bytes).is_err() {
+                    errors.push(LiveValidationError::ManifestVerification(format!(
+                        "{filename}: invalid JSON"
+                    )));
+                }
+            }
+            ARTIFACT_ROLE_PAIR_REPORT => {
+                let text = String::from_utf8_lossy(&bytes);
+                if !text.starts_with(LIVE_PAIR_REPORT_DISCLAIMER_PREFIX) {
+                    errors.push(LiveValidationError::ManifestVerification(format!(
+                        "{filename}: missing required disclaimer prefix"
+                    )));
+                }
+            }
+            other => errors.push(LiveValidationError::ManifestVerification(format!(
+                "unexpected artifactRole: {other}"
+            ))),
+        }
+    }
+
+    for (required_filename, required_role) in required_live_artifact_spec() {
+        match manifest_entries.get(*required_filename) {
+            Some(role) if role == required_role => {}
+            Some(role) => errors.push(LiveValidationError::ManifestVerification(format!(
+                "unexpected artifactRole for {required_filename}: {role}"
+            ))),
+            None => errors.push(LiveValidationError::ManifestVerification(format!(
+                "missing required manifest entry: {required_filename}"
+            ))),
+        }
+    }
+
+    for filename in manifest_entries.keys() {
+        if !required_live_artifact_spec()
+            .iter()
+            .any(|(required, _)| required == filename)
+        {
+            errors.push(LiveValidationError::ManifestVerification(format!(
+                "unexpected manifest filename: {filename}"
+            )));
         }
     }
 
@@ -591,4 +758,20 @@ pub fn verify_live_artifact_manifest(dir: &std::path::Path) -> LiveValidationRes
     } else {
         LiveValidationResult::err(errors)
     }
+}
+
+pub fn validate_manifest_filename(filename: &str) -> Option<&'static str> {
+    if filename.is_empty() {
+        return Some("empty filename");
+    }
+    if filename.starts_with('/') || filename.starts_with('\\') {
+        return Some("absolute path not allowed");
+    }
+    if filename.contains("..") {
+        return Some("path traversal not allowed");
+    }
+    if filename.contains('/') || filename.contains('\\') {
+        return Some("path separators not allowed");
+    }
+    None
 }
