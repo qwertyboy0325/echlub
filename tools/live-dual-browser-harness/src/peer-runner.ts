@@ -54,40 +54,48 @@ export async function launchPeer(config: PeerConfig): Promise<PeerSession> {
   page.on("pageerror", (error) => {
     pageErrors.push(error.message);
   });
-  await page.goto(LIVE_URL, { waitUntil: "networkidle", timeout: 60_000 });
+  await page.goto(LIVE_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.getByRole("button", { name: "Live Session" }).click();
   await configurePeer(page, config);
   return { role: config.role, context, page, consoleLogs, pageErrors };
 }
 
 async function configurePeer(page: Page, config: PeerConfig): Promise<void> {
-  await page.getByLabel(/Session correlation ID/i).fill(config.correlationId);
-  await page.getByLabel(/^Role$/i).selectOption(config.role);
-  await page.getByLabel(/Signaling URL/i).fill(SIGNALING_URL);
-  await page.getByLabel(/Capture profile/i).selectOption("browser_default");
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: /^Prepare$/i }).click();
-  await page.getByRole("button", { name: /Enable Microphone/i }).click();
+  const panel = page.locator("section.performance-panel");
+  await panel.getByRole("heading", { name: /Live Two-Peer Observation/i }).waitFor({ timeout: 60_000 });
+  await panel.getByLabel(/Session correlation ID/i).fill(config.correlationId);
+  await panel.getByLabel(/^Role$/i).selectOption(config.role);
+  await panel.getByLabel(/Signaling URL/i).fill(SIGNALING_URL);
+  await panel.getByLabel(/Capture profile/i).selectOption("browser_default");
+  await panel.getByRole("checkbox").check();
+  await panel.getByRole("button", { name: /^Prepare$/i }).click();
+  await panel.getByRole("button", { name: /Enable Microphone/i }).click();
 }
 
 export async function connectPeer(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /^Connect$/i }).click();
+  const panel = page.locator("section.performance-panel");
+  await panel.getByRole("button", { name: /^Connect$/i }).click();
 }
 
 export async function waitForReady(page: Page, timeoutMs = READY_TIMEOUT_MS): Promise<void> {
-  await page.getByText(/Phase: Ready To Observe/i).waitFor({ timeout: timeoutMs });
+  const panel = page.locator("section.performance-panel");
+  await panel.getByText(/Phase: Ready To Observe/i).waitFor({ timeout: timeoutMs });
 }
 
 export async function startObservation(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /Start 60s Observation/i }).click();
+  const panel = page.locator("section.performance-panel");
+  await panel.getByRole("button", { name: /Start 60s Observation/i }).click();
 }
 
 export async function waitForCompleted(page: Page, timeoutMs = COMPLETED_TIMEOUT_MS): Promise<void> {
-  await page.getByText(/Phase: Completed/i).waitFor({ timeout: timeoutMs });
+  const panel = page.locator("section.performance-panel");
+  await panel.getByText(/Phase: Completed/i).waitFor({ timeout: timeoutMs });
 }
 
 export async function exportFinalized(page: Page, destination: string): Promise<void> {
+  const panel = page.locator("section.performance-panel");
   const downloadPromise = page.waitForEvent("download", { timeout: 30_000 });
-  await page.getByRole("button", { name: /Export Finalized Endpoint/i }).click();
+  await panel.getByRole("button", { name: /Export Finalized Endpoint/i }).click();
   const download = await downloadPromise;
   await download.saveAs(destination);
 }
