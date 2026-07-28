@@ -1,10 +1,26 @@
 # EchLub
 
-Collaborative music production platform — **foundation + performance baseline** scaffold for a greenfield rewrite.
+Experimental music-systems foundation and performance evidence lab.
 
-No mouth-to-ear, production-readiness, CRDT-completeness, or transport-selection claims are demonstrated.
+The current repository demonstrates bounded technical foundations:
 
-Legacy repositories are external read-only references under `.reference/` (gitignored).
+- deterministic semantic operations over explicit musical document state;
+- transport-independent protocol and session contracts;
+- a Web UI and control-plane laboratory;
+- exploratory WebRTC instrumentation and reproducible performance evidence.
+
+## Product status
+
+EchLub does not currently claim collaborative composition as a selling point or product differentiator.
+
+The earlier collaboration-led demo direction failed to make collaboration perceptible to a cold viewer: cursor and presence activity read as interface choreography, while scripted state transitions did not establish musicians changing one another's work. That history is retained as research evidence, not promoted as a successful product demo.
+
+No replacement product thesis is selected here. In particular, this repository does not claim:
+
+- a production-ready DAW;
+- a complete CRDT or musical conflict-resolution model;
+- latency superiority or a final transport choice;
+- that low-latency performance, Live recomposition, AI, or the Rust audio core is automatically the next product direction.
 
 ## Structure
 
