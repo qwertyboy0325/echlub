@@ -179,11 +179,13 @@ pub struct EndpointProfile {
 }
 
 impl EndpointProfile {
-    pub const PRESETS: [&'static str; 10] = [
+    pub const PRESETS: [&'static str; 12] = [
         "native-interface",
         "native-builtin",
         "phone-app",
         "phone-ios-app",
+        "phone-ios-app-128",
+        "phone-ios-bluetooth",
         "phone-android-low-latency",
         "phone-android-generic",
         "phone-interface",
@@ -201,8 +203,14 @@ impl EndpointProfile {
             // Native app on a phone using its own audio stack (wired
             // headset). Varies widely by OS and model.
             "phone-app" => (10.0, 15.0, 1.0, 0.0, 1.0, 0.0),
-            // iOS app on Core Audio with small IO buffers, wired headset.
+            // iOS app on Core Audio, 256-frame IO buffer, `.measurement`
+            // mode (no voice processing), wired headphones (USB-C/Lightning
+            // DAC included in converter time).
             "phone-ios-app" => (5.33, 5.33, 1.0, 0.0, 0.5, 0.0),
+            // Same with a 128-frame IO buffer, if the device grants it.
+            "phone-ios-app-128" => (2.67, 2.67, 1.0, 0.0, 0.5, 0.0),
+            // Same app monitoring over Bluetooth earbuds (AAC/SBC codec path).
+            "phone-ios-bluetooth" => (5.33, 150.0, 1.0, 0.0, 0.5, 0.0),
             // Android app on the AAudio/Oboe low-latency path (device must
             // support it), wired headset.
             "phone-android-low-latency" => (5.0, 10.0, 1.0, 0.0, 0.5, 0.0),

@@ -4,10 +4,10 @@
 
 | Bot | Sent | Uplink drops | Mixes recv | Downlink drops | Concealed | Late ticks |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 2996 | 3 | 8973 | 3 | 32 | 1 |
-| 1 | 2998 | 1 | 8971 | 4 | 37 | 3 |
-| 2 | 2996 | 3 | 8975 | 12 | 36 | 9 |
-| 3 | 2989 | 10 | 8982 | 41 | 55 | 3 |
+| 0 | 2996 | 3 | 8974 | 3 | 88 | 24 |
+| 1 | 2998 | 1 | 8971 | 4 | 99 | 36 |
+| 2 | 2996 | 3 | 8975 | 12 | 78 | 23 |
+| 3 | 2989 | 10 | 8983 | 41 | 85 | 26 |
 
 ## Probe latency (capture → playout, no device buffers)
 
@@ -26,4 +26,4 @@
 | 1 → 3 | 8 | 37.3 | 37.3 | 37.3 |
 | 2 → 3 | 8 | 45.3 | 45.3 | 45.3 |
 
-Relay: 3018 ticks, 9 late, 11976 packets in, 35904 out, 0 decode errors.
+Relay: 3018 ticks, 31 late, 11975 packets in, 35904 out, 0 decode errors.

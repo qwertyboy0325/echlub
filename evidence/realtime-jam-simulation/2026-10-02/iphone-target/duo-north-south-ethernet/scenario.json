@@ -1,0 +1,234 @@
+{
+  "evidence_level": "Simulation",
+  "disclaimer": "All network, device, and musician parameters are ASSUMED planning values. This is not a measurement and makes no latency claim about real networks.",
+  "name": "custom",
+  "players": [
+    {
+      "role": "drums",
+      "site": "taipei",
+      "access": "fiber-wired",
+      "endpoint": "phone-ios-app",
+      "follower": false
+    },
+    {
+      "role": "bass",
+      "site": "kaohsiung",
+      "access": "fiber-wired",
+      "endpoint": "phone-ios-app",
+      "follower": false
+    }
+  ],
+  "endpoint": {
+    "name": "native-interface",
+    "capture_ms": 1.33,
+    "playback_ms": 1.33,
+    "converter_ms": 0.5,
+    "codec_extra_ms": 0.0,
+    "processing_ms": 0.0,
+    "min_jitter_ms": 0.0,
+    "provenance": "Assumed"
+  },
+  "cross_isp": false,
+  "bpm": 120.0,
+  "bars": 32,
+  "pipeline": {
+    "evidence_level": "Simulation",
+    "note": "Simulated pipeline with ASSUMED link/endpoint profiles. Not a measurement of any real network or device.",
+    "frame_ms": 2.6666666666666665,
+    "duration_ms": 20000.0,
+    "seed": 1,
+    "topology": "forward",
+    "peers": [
+      {
+        "name": "drums@taipei/fiber-wired/phone-ios-app",
+        "link": {
+          "name": "taipei/fiber-wired",
+          "base_ms": 3.5,
+          "jitter_mean_ms": 0.6,
+          "loss": 0.0004999999999999449,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "phone-ios-app",
+          "capture_ms": 5.33,
+          "playback_ms": 5.33,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 0.0,
+          "processing_ms": 0.5,
+          "min_jitter_ms": 0.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 2,
+        "coverage": 0.95,
+        "redundancy": 2
+      },
+      {
+        "name": "bass@kaohsiung/fiber-wired/phone-ios-app",
+        "link": {
+          "name": "kaohsiung/fiber-wired",
+          "base_ms": 3.3,
+          "jitter_mean_ms": 0.6,
+          "loss": 0.0004999999999999449,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "phone-ios-app",
+          "capture_ms": 5.33,
+          "playback_ms": 5.33,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 0.0,
+          "processing_ms": 0.5,
+          "min_jitter_ms": 0.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 2,
+        "coverage": 0.95,
+        "redundancy": 2
+      }
+    ],
+    "pairs": [
+      {
+        "from": "drums@taipei/fiber-wired/phone-ios-app",
+        "to": "bass@kaohsiung/fiber-wired/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 14.0,
+          "p50_ms": 14.0,
+          "p95_ms": 14.0,
+          "max_ms": 14.0
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 27.16,
+        "mouth_to_ear_p95_ms": 27.16,
+        "analytic_budget_ms": 30.49333333333333,
+        "concealed_pct": 0.0133422281521014,
+        "dropouts_per_min": 3.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "bass@kaohsiung/fiber-wired/phone-ios-app",
+        "to": "drums@taipei/fiber-wired/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 13.999999999999222,
+          "p50_ms": 13.999999999999886,
+          "p95_ms": 14.0,
+          "max_ms": 14.0
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 27.159999999999886,
+        "mouth_to_ear_p95_ms": 27.16,
+        "analytic_budget_ms": 30.493333333333332,
+        "concealed_pct": 0.0,
+        "dropouts_per_min": 0.0,
+        "audible_dropouts_per_min": 0.0
+      }
+    ],
+    "relay_jitter": [],
+    "client_jitter": [
+      {
+        "received": 7496,
+        "played": 7495,
+        "concealed": 0,
+        "late_dropped": 63,
+        "overflow_dropped": 0,
+        "duplicates": 7416,
+        "resets": 0,
+        "dropouts": 0,
+        "audible_dropouts": 0
+      },
+      {
+        "received": 7495,
+        "played": 7494,
+        "concealed": 1,
+        "late_dropped": 69,
+        "overflow_dropped": 0,
+        "duplicates": 7411,
+        "resets": 0,
+        "dropouts": 1,
+        "audible_dropouts": 0
+      }
+    ]
+  },
+  "latency_matrix_ms": [
+    [
+      0.0,
+      27.16
+    ],
+    [
+      27.159999999999886,
+      0.0
+    ]
+  ],
+  "ensemble_runs": 20,
+  "tight_fraction": 0.0,
+  "playable_or_better_fraction": 1.0,
+  "mean_tempo_drift_pct": -1.7890624458623101,
+  "mean_worst_heard_rms_ms": 34.96307894510814,
+  "coverage": 0.95,
+  "redundancy": 2,
+  "worst_dropouts_per_min": 3.0,
+  "worst_audible_dropouts_per_min": 0.0,
+  "worst_concealed_pct": 0.0133422281521014,
+  "thresholds": {
+    "tight_drift_pct": 2.0,
+    "tight_heard_rms_ms": 30.0,
+    "playable_drift_pct": 5.0,
+    "playable_heard_rms_ms": 45.0
+  },
+  "example_run": {
+    "evidence_level": "Simulation",
+    "target_bpm": 120.0,
+    "start_bpm": 118.46364955874556,
+    "end_bpm": 116.71222169204609,
+    "tempo_drift_pct": -2.739815256628262,
+    "worst_heard_rms_ms": 35.16587775876503,
+    "onset_spread_sd_ms": 5.7739957601401075,
+    "causality_warning": false,
+    "verdict": "Playable",
+    "thresholds": {
+      "tight_drift_pct": 2.0,
+      "tight_heard_rms_ms": 30.0,
+      "playable_drift_pct": 5.0,
+      "playable_heard_rms_ms": 45.0
+    },
+    "players": [
+      {
+        "name": "drums@taipei/fiber-wired/phone-ios-app",
+        "role": "drums",
+        "heard_rms_async_ms": 35.16587775876503,
+        "heard_mean_async_ms": 32.61269503761353
+      },
+      {
+        "name": "bass@kaohsiung/fiber-wired/phone-ios-app",
+        "role": "bass",
+        "heard_rms_async_ms": 25.382241226066142,
+        "heard_mean_async_ms": 21.707304962389877
+      }
+    ],
+    "heard_offset_ms": [
+      [
+        0.0,
+        21.707304962389877
+      ],
+      [
+        32.61269503761353,
+        0.0
+      ]
+    ],
+    "heard_rms_ms": [
+      [
+        0.0,
+        25.382241226066142
+      ],
+      [
+        35.16587775876503,
+        0.0
+      ]
+    ]
+  }
+}

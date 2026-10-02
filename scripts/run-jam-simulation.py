@@ -79,6 +79,55 @@ def phone_terminals(out: Path) -> None:
     (root / "matrix.md").write_text("# Phones as terminals\n\n" + note + "\n" + "\n".join(rows) + "\n")
 
 
+def iphone_target(out: Path) -> None:
+    """ADR-0007 target: all iPhone, wired monitoring, network as the variable."""
+    e = "fiber-wired"
+
+    def band(access: list[str], device: str = "phone-ios-app") -> str:
+        seats = [("drums", "taipei"), ("bass", "taichung"), ("guitar", "tainan"), ("vocals", "kaohsiung")]
+        return ",".join(f"{r}@{s}/{a}/{device}" for (r, s), a in zip(seats, access))
+
+    cases = [
+        ("duo-same-city-ethernet", f"drums@taichung/{e}/phone-ios-app,bass@taichung/{e}/phone-ios-app"),
+        ("duo-north-south-ethernet", f"drums@taipei/{e}/phone-ios-app,bass@kaohsiung/{e}/phone-ios-app"),
+        ("duo-north-south-wifi", "drums@taipei/wifi/phone-ios-app,bass@kaohsiung/wifi/phone-ios-app"),
+        ("rock4-ethernet-256", band([e] * 4)),
+        ("rock4-ethernet-128", band([e] * 4, "phone-ios-app-128")),
+        ("rock4-3eth-vocals-wifi", band([e, e, e, "wifi"])),
+        ("rock4-3eth-vocals-5g-sa", band([e, e, e, "mobile-5g-sa"])),
+        ("rock4-3eth-drums-wifi", band(["wifi", e, e, e])),
+        ("rock4-2eth-2wifi", band([e, e, "wifi", "wifi"])),
+        ("rock4-all-wifi", band(["wifi"] * 4)),
+        ("rock4-all-wifi-128", band(["wifi"] * 4, "phone-ios-app-128")),
+        ("rock4-all-5g-sa", band(["mobile-5g-sa"] * 4)),
+        ("rock4-all-5g", band(["mobile-5g"] * 4)),
+        ("rock4-all-4g", band(["mobile-4g"] * 4)),
+        ("rock4-ethernet-bluetooth", band([e] * 4, "phone-ios-bluetooth")),
+    ]
+    root = out / "iphone-target"
+    rows = [
+        "| Case | Mouth-to-ear p50 range (ms) | Tempo drift | Tight | Playable+ | Worst audible dropouts/min |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for name, players in cases:
+        d = root / name
+        lab("scenario", "--players", players, "--topology", "forward", "--redundancy", "2",
+            "--coverage", "0.95", "--out", str(d))
+        r = json.loads((d / "scenario.json").read_text())
+        lat = [x for row in r["latency_matrix_ms"] for x in row if x > 0]
+        rows.append(
+            f"| {name} | {min(lat):.1f}–{max(lat):.1f} | {r['mean_tempo_drift_pct']:+.2f}% "
+            f"| {r['tight_fraction'] * 100:.0f}% | {r['playable_or_better_fraction'] * 100:.0f}% "
+            f"| {r['worst_audible_dropouts_per_min']:.1f} |"
+        )
+    note = (
+        "> **SIMULATION.** ADR-0007 condition: all iPhone, native app, wired monitoring "
+        "(except the Bluetooth contrast). Assumed profiles; `fiber-wired` = USB-C Ethernet "
+        "adapter on a fibre line. Forward topology, 2 copies per frame, 95% coverage.\n"
+    )
+    (root / "matrix.md").write_text("# All-iPhone target\n\n" + note + "\n" + "\n".join(rows) + "\n")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--label", default=dt.date.today().isoformat())
@@ -121,6 +170,7 @@ def main() -> int:
         "--out", str(out / "sweep-compensation-0.7"),
     )
     phone_terminals(out)
+    iphone_target(out)
     for role in ["vocals", "drums"]:
         lab("mobile-study", "--role", role, "--seeds", "10", "--out", str(out / f"mobile-study-{role}"))
     if not args.skip_udp:

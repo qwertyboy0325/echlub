@@ -12,7 +12,8 @@
   ADR-0006).
 - Work goes straight to a prototype, backed by simulated musicians so ideas
   can be exercised before real players are recruited.
-- Some experiments will use phones as terminals.
+- Target terminal and first experiment condition: **every player on an
+  iPhone with a native app and wired monitoring** (ADR-0007).
 - Current conclusions and the catalogue of network and non-network latency
   strategies: `jam-latency-conclusions.md`. Interval (bar-delay) mode is
   deferred.

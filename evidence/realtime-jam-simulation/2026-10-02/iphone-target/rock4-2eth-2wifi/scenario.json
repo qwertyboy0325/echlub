@@ -1,0 +1,576 @@
+{
+  "evidence_level": "Simulation",
+  "disclaimer": "All network, device, and musician parameters are ASSUMED planning values. This is not a measurement and makes no latency claim about real networks.",
+  "name": "custom",
+  "players": [
+    {
+      "role": "drums",
+      "site": "taipei",
+      "access": "fiber-wired",
+      "endpoint": "phone-ios-app",
+      "follower": false
+    },
+    {
+      "role": "bass",
+      "site": "taichung",
+      "access": "fiber-wired",
+      "endpoint": "phone-ios-app",
+      "follower": false
+    },
+    {
+      "role": "guitar",
+      "site": "tainan",
+      "access": "wifi",
+      "endpoint": "phone-ios-app",
+      "follower": false
+    },
+    {
+      "role": "vocals",
+      "site": "kaohsiung",
+      "access": "wifi",
+      "endpoint": "phone-ios-app",
+      "follower": false
+    }
+  ],
+  "endpoint": {
+    "name": "native-interface",
+    "capture_ms": 1.33,
+    "playback_ms": 1.33,
+    "converter_ms": 0.5,
+    "codec_extra_ms": 0.0,
+    "processing_ms": 0.0,
+    "min_jitter_ms": 0.0,
+    "provenance": "Assumed"
+  },
+  "cross_isp": false,
+  "bpm": 120.0,
+  "bars": 32,
+  "pipeline": {
+    "evidence_level": "Simulation",
+    "note": "Simulated pipeline with ASSUMED link/endpoint profiles. Not a measurement of any real network or device.",
+    "frame_ms": 2.6666666666666665,
+    "duration_ms": 20000.0,
+    "seed": 1,
+    "topology": "forward",
+    "peers": [
+      {
+        "name": "drums@taipei/fiber-wired/phone-ios-app",
+        "link": {
+          "name": "taipei/fiber-wired",
+          "base_ms": 3.5,
+          "jitter_mean_ms": 0.6,
+          "loss": 0.0004999999999999449,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "phone-ios-app",
+          "capture_ms": 5.33,
+          "playback_ms": 5.33,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 0.0,
+          "processing_ms": 0.5,
+          "min_jitter_ms": 0.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 2,
+        "coverage": 0.95,
+        "redundancy": 2
+      },
+      {
+        "name": "bass@taichung/fiber-wired/phone-ios-app",
+        "link": {
+          "name": "taichung/fiber-wired",
+          "base_ms": 1.8,
+          "jitter_mean_ms": 0.5,
+          "loss": 0.0004999999999999449,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "phone-ios-app",
+          "capture_ms": 5.33,
+          "playback_ms": 5.33,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 0.0,
+          "processing_ms": 0.5,
+          "min_jitter_ms": 0.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 2,
+        "coverage": 0.95,
+        "redundancy": 2
+      },
+      {
+        "name": "guitar@tainan/wifi/phone-ios-app",
+        "link": {
+          "name": "tainan/wifi",
+          "base_ms": 3.8,
+          "jitter_mean_ms": 3.3,
+          "loss": 0.0050000000000000044,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "phone-ios-app",
+          "capture_ms": 5.33,
+          "playback_ms": 5.33,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 0.0,
+          "processing_ms": 0.5,
+          "min_jitter_ms": 0.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 3,
+        "coverage": 0.95,
+        "redundancy": 2
+      },
+      {
+        "name": "vocals@kaohsiung/wifi/phone-ios-app",
+        "link": {
+          "name": "kaohsiung/wifi",
+          "base_ms": 4.3,
+          "jitter_mean_ms": 3.3,
+          "loss": 0.0050000000000000044,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "phone-ios-app",
+          "capture_ms": 5.33,
+          "playback_ms": 5.33,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 0.0,
+          "processing_ms": 0.5,
+          "min_jitter_ms": 0.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 3,
+        "coverage": 0.95,
+        "redundancy": 2
+      }
+    ],
+    "pairs": [
+      {
+        "from": "drums@taipei/fiber-wired/phone-ios-app",
+        "to": "bass@taichung/fiber-wired/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 11.333333333332568,
+          "p50_ms": 11.33333333333212,
+          "p95_ms": 11.333333333333258,
+          "max_ms": 11.333333333333332
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 24.49333333333212,
+        "mouth_to_ear_p95_ms": 24.493333333333258,
+        "analytic_budget_ms": 28.89333333333333,
+        "concealed_pct": 0.013340448239060833,
+        "dropouts_per_min": 3.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "drums@taipei/fiber-wired/phone-ios-app",
+        "to": "guitar@tainan/wifi/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 19.349999999999262,
+          "p50_ms": 19.33333333333212,
+          "p95_ms": 19.333333333333332,
+          "max_ms": 19.66666666666697
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 32.49333333333212,
+        "mouth_to_ear_p95_ms": 32.49333333333333,
+        "analytic_budget_ms": 39.026666666666664,
+        "concealed_pct": 0.6005605231549446,
+        "dropouts_per_min": 132.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "drums@taipei/fiber-wired/phone-ios-app",
+        "to": "vocals@kaohsiung/wifi/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 22.0,
+          "p50_ms": 22.0,
+          "p95_ms": 22.0,
+          "max_ms": 22.0
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 35.16,
+        "mouth_to_ear_p95_ms": 35.16,
+        "analytic_budget_ms": 39.526666666666664,
+        "concealed_pct": 0.2402562733582488,
+        "dropouts_per_min": 54.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "bass@taichung/fiber-wired/phone-ios-app",
+        "to": "drums@taipei/fiber-wired/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 13.999999999999137,
+          "p50_ms": 13.999999999999545,
+          "p95_ms": 14.0,
+          "max_ms": 14.0
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 27.159999999999545,
+        "mouth_to_ear_p95_ms": 27.16,
+        "analytic_budget_ms": 28.89333333333333,
+        "concealed_pct": 0.0,
+        "dropouts_per_min": 0.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "bass@taichung/fiber-wired/phone-ios-app",
+        "to": "guitar@tainan/wifi/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 19.33333333333325,
+          "p50_ms": 19.33333333333303,
+          "p95_ms": 19.33333333333576,
+          "max_ms": 19.33333333333576
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 32.49333333333303,
+        "mouth_to_ear_p95_ms": 32.493333333335755,
+        "analytic_budget_ms": 37.22666666666667,
+        "concealed_pct": 0.186841051648205,
+        "dropouts_per_min": 42.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "bass@taichung/fiber-wired/phone-ios-app",
+        "to": "vocals@kaohsiung/wifi/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 19.33333333333325,
+          "p50_ms": 19.33333333333303,
+          "p95_ms": 19.33333333333576,
+          "max_ms": 19.33333333333576
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 32.49333333333303,
+        "mouth_to_ear_p95_ms": 32.493333333335755,
+        "analytic_budget_ms": 37.72666666666667,
+        "concealed_pct": 0.20018684105164822,
+        "dropouts_per_min": 45.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "guitar@tainan/wifi/phone-ios-app",
+        "to": "drums@taipei/fiber-wired/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 24.666666666666714,
+          "p50_ms": 24.66666666666663,
+          "p95_ms": 24.66666666666788,
+          "max_ms": 24.66666666666788
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 37.826666666666625,
+        "mouth_to_ear_p95_ms": 37.826666666667876,
+        "analytic_budget_ms": 39.026666666666664,
+        "concealed_pct": 0.06674676278200507,
+        "dropouts_per_min": 15.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "guitar@tainan/wifi/phone-ios-app",
+        "to": "bass@taichung/fiber-wired/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 21.999999999999222,
+          "p50_ms": 21.999999999999886,
+          "p95_ms": 22.0,
+          "max_ms": 22.0
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 35.15999999999988,
+        "mouth_to_ear_p95_ms": 35.16,
+        "analytic_budget_ms": 37.22666666666667,
+        "concealed_pct": 0.0800854244527496,
+        "dropouts_per_min": 18.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "guitar@tainan/wifi/phone-ios-app",
+        "to": "vocals@kaohsiung/wifi/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 29.999999999999222,
+          "p50_ms": 29.999999999999886,
+          "p95_ms": 30.0,
+          "max_ms": 30.0
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 43.15999999999988,
+        "mouth_to_ear_p95_ms": 43.16,
+        "analytic_budget_ms": 45.193333333333335,
+        "concealed_pct": 0.1335291761249833,
+        "dropouts_per_min": 30.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "vocals@kaohsiung/wifi/phone-ios-app",
+        "to": "drums@taipei/fiber-wired/phone-ios-app",
+        "expected_probes": 19,
+        "detected_probes": 19,
+        "network_path": {
+          "count": 19,
+          "mean_ms": 22.0,
+          "p50_ms": 22.0,
+          "p95_ms": 22.0,
+          "max_ms": 22.0
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 35.16,
+        "mouth_to_ear_p95_ms": 35.16,
+        "analytic_budget_ms": 39.526666666666664,
+        "concealed_pct": 0.1201281366791244,
+        "dropouts_per_min": 27.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "vocals@kaohsiung/wifi/phone-ios-app",
+        "to": "bass@taichung/fiber-wired/phone-ios-app",
+        "expected_probes": 19,
+        "detected_probes": 19,
+        "network_path": {
+          "count": 19,
+          "mean_ms": 22.0,
+          "p50_ms": 22.0,
+          "p95_ms": 22.0,
+          "max_ms": 22.0
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 35.16,
+        "mouth_to_ear_p95_ms": 35.16,
+        "analytic_budget_ms": 37.72666666666667,
+        "concealed_pct": 0.0400427122263748,
+        "dropouts_per_min": 9.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "vocals@kaohsiung/wifi/phone-ios-app",
+        "to": "guitar@tainan/wifi/phone-ios-app",
+        "expected_probes": 19,
+        "detected_probes": 19,
+        "network_path": {
+          "count": 19,
+          "mean_ms": 30.0,
+          "p50_ms": 30.0,
+          "p95_ms": 30.0,
+          "max_ms": 30.0
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 43.16,
+        "mouth_to_ear_p95_ms": 43.16,
+        "analytic_budget_ms": 45.193333333333335,
+        "concealed_pct": 0.02670583522499666,
+        "dropouts_per_min": 6.0,
+        "audible_dropouts_per_min": 0.0
+      }
+    ],
+    "relay_jitter": [],
+    "client_jitter": [
+      {
+        "received": 22473,
+        "played": 22464,
+        "concealed": 14,
+        "late_dropped": 753,
+        "overflow_dropped": 0,
+        "duplicates": 21549,
+        "resets": 0,
+        "dropouts": 14,
+        "audible_dropouts": 0
+      },
+      {
+        "received": 22479,
+        "played": 22470,
+        "concealed": 10,
+        "late_dropped": 806,
+        "overflow_dropped": 0,
+        "duplicates": 21491,
+        "resets": 0,
+        "dropouts": 10,
+        "audible_dropouts": 0
+      },
+      {
+        "received": 22422,
+        "played": 22414,
+        "concealed": 61,
+        "late_dropped": 1933,
+        "overflow_dropped": 0,
+        "duplicates": 20326,
+        "resets": 0,
+        "dropouts": 60,
+        "audible_dropouts": 0
+      },
+      {
+        "received": 22442,
+        "played": 22431,
+        "concealed": 43,
+        "late_dropped": 1578,
+        "overflow_dropped": 0,
+        "duplicates": 20603,
+        "resets": 0,
+        "dropouts": 43,
+        "audible_dropouts": 0
+      }
+    ]
+  },
+  "latency_matrix_ms": [
+    [
+      0.0,
+      24.49333333333212,
+      32.49333333333212,
+      35.16
+    ],
+    [
+      27.159999999999545,
+      0.0,
+      32.49333333333303,
+      32.49333333333303
+    ],
+    [
+      37.826666666666625,
+      35.15999999999988,
+      0.0,
+      43.15999999999988
+    ],
+    [
+      35.16,
+      35.16,
+      43.16,
+      0.0
+    ]
+  ],
+  "ensemble_runs": 20,
+  "tight_fraction": 0.0,
+  "playable_or_better_fraction": 0.0,
+  "mean_tempo_drift_pct": -2.4049563398875717,
+  "mean_worst_heard_rms_ms": 46.65837665801907,
+  "coverage": 0.95,
+  "redundancy": 2,
+  "worst_dropouts_per_min": 132.0,
+  "worst_audible_dropouts_per_min": 0.0,
+  "worst_concealed_pct": 0.6005605231549446,
+  "thresholds": {
+    "tight_drift_pct": 2.0,
+    "tight_heard_rms_ms": 30.0,
+    "playable_drift_pct": 5.0,
+    "playable_heard_rms_ms": 45.0
+  },
+  "example_run": {
+    "evidence_level": "Simulation",
+    "target_bpm": 120.0,
+    "start_bpm": 118.12372641949494,
+    "end_bpm": 116.84342829756338,
+    "tempo_drift_pct": -2.630476418697185,
+    "worst_heard_rms_ms": 46.361141743748775,
+    "onset_spread_sd_ms": 10.742642276922165,
+    "causality_warning": false,
+    "verdict": "Struggling",
+    "thresholds": {
+      "tight_drift_pct": 2.0,
+      "tight_heard_rms_ms": 30.0,
+      "playable_drift_pct": 5.0,
+      "playable_heard_rms_ms": 45.0
+    },
+    "players": [
+      {
+        "name": "drums@taipei/fiber-wired/phone-ios-app",
+        "role": "drums",
+        "heard_rms_async_ms": 46.361141743748775,
+        "heard_mean_async_ms": 42.75090807485305
+      },
+      {
+        "name": "bass@taichung/fiber-wired/phone-ios-app",
+        "role": "bass",
+        "heard_rms_async_ms": 36.06834154299653,
+        "heard_mean_async_ms": 30.24811935790627
+      },
+      {
+        "name": "guitar@tainan/wifi/phone-ios-app",
+        "role": "guitar",
+        "heard_rms_async_ms": 35.80940176209676,
+        "heard_mean_async_ms": 30.520486880003862
+      },
+      {
+        "name": "vocals@kaohsiung/wifi/phone-ios-app",
+        "role": "vocals",
+        "heard_rms_async_ms": 40.90603046248053,
+        "heard_mean_async_ms": 34.45381902057162
+      }
+    ],
+    "heard_offset_ms": [
+      [
+        0.0,
+        16.44957512895481,
+        21.32051743719536,
+        26.27051654262348
+      ],
+      [
+        35.203758204375134,
+        0.0,
+        29.364275641572856,
+        31.64760808033125
+      ],
+      [
+        48.99948256280404,
+        38.28905769176119,
+        0.0,
+        45.44333243876013
+      ],
+      [
+        44.04948345737998,
+        36.00572525300281,
+        40.87666756124335,
+        0.0
+      ]
+    ],
+    "heard_rms_ms": [
+      [
+        0.0,
+        21.88079928134807,
+        26.73582236785808,
+        33.00265088758919
+      ],
+      [
+        38.04583350354695,
+        0.0,
+        32.5650814391289,
+        38.27387450862259
+      ],
+      [
+        51.58671365107924,
+        40.79553632575309,
+        0.0,
+        49.65728092719413
+      ],
+      [
+        48.36726081817983,
+        41.949143301029,
+        45.515393405473446,
+        0.0
+      ]
+    ]
+  }
+}

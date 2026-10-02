@@ -76,7 +76,7 @@ impl PlayerSpec {
     }
 }
 
-pub const PRESETS: [(&str, &str); 5] = [
+pub const PRESETS: [(&str, &str); 11] = [
     (
         "taiwan-duo",
         "drums@taipei/fiber-wired,bass@kaohsiung/fiber-wired",
@@ -96,6 +96,30 @@ pub const PRESETS: [(&str, &str); 5] = [
     (
         "taiwan-rock-4-mobile",
         "drums@taipei/fiber-wired,bass@taichung/fiber-wired,guitar@kaohsiung/fiber-wired,vocals@tainan/mobile-4g",
+    ),
+    (
+        "iphone-duo-ethernet",
+        "drums@taipei/fiber-wired/phone-ios-app,bass@kaohsiung/fiber-wired/phone-ios-app",
+    ),
+    (
+        "iphone-rock-4-ethernet",
+        "drums@taipei/fiber-wired/phone-ios-app,bass@taichung/fiber-wired/phone-ios-app,guitar@tainan/fiber-wired/phone-ios-app,vocals@kaohsiung/fiber-wired/phone-ios-app",
+    ),
+    (
+        "iphone-rock-4-wifi",
+        "drums@taipei/wifi/phone-ios-app,bass@taichung/wifi/phone-ios-app,guitar@tainan/wifi/phone-ios-app,vocals@kaohsiung/wifi/phone-ios-app",
+    ),
+    (
+        "iphone-rock-4-5g-sa",
+        "drums@taipei/mobile-5g-sa/phone-ios-app,bass@taichung/mobile-5g-sa/phone-ios-app,guitar@tainan/mobile-5g-sa/phone-ios-app,vocals@kaohsiung/mobile-5g-sa/phone-ios-app",
+    ),
+    (
+        "iphone-rock-4-5g",
+        "drums@taipei/mobile-5g/phone-ios-app,bass@taichung/mobile-5g/phone-ios-app,guitar@tainan/mobile-5g/phone-ios-app,vocals@kaohsiung/mobile-5g/phone-ios-app",
+    ),
+    (
+        "iphone-rock-4-4g",
+        "drums@taipei/mobile-4g/phone-ios-app,bass@taichung/mobile-4g/phone-ios-app,guitar@tainan/mobile-4g/phone-ios-app,vocals@kaohsiung/mobile-4g/phone-ios-app",
     ),
 ];
 

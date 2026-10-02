@@ -73,6 +73,21 @@ only; **deferred** = owner postponed.
 | Show a latency score and suggested roles before a session | doc | |
 | Choose relay per group location | doc | |
 
+## Target condition: all iPhone + wired monitoring (ADR-0007)
+
+| All-iPhone 4-piece | Paths (ms) | Band playable |
+| --- | --- | --- |
+| Ethernet adapter, 256-frame buffer | ~25–27 | yes |
+| Ethernet adapter, 128-frame buffer | ~19–22 | yes, partly tight |
+| 3 Ethernet + vocals on Wi-Fi or 5G SA | ~25–35 | yes |
+| 3 Ethernet + drums on Wi-Fi | ~25–35 | borderline |
+| All Wi-Fi | ~35–43 | no |
+| All 5G SA / 5G / 4G | ~41–46 / ~59–70 / ~97–113 | no |
+| Ethernet, Bluetooth monitoring | ~170 | no |
+
+Same-city vs Taipei–Kaohsiung differs by only ~3 ms. Protocol:
+`docs/work-packages/ECHLUB-IPHONE-JAM-EXPERIMENT-01.md`.
+
 ## Phones as terminals (planned for some experiments)
 
 Simulated with a wired 4-piece where the vocalist is on a phone, or all four

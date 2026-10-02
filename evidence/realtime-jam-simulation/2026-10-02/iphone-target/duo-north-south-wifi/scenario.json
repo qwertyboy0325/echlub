@@ -1,0 +1,234 @@
+{
+  "evidence_level": "Simulation",
+  "disclaimer": "All network, device, and musician parameters are ASSUMED planning values. This is not a measurement and makes no latency claim about real networks.",
+  "name": "custom",
+  "players": [
+    {
+      "role": "drums",
+      "site": "taipei",
+      "access": "wifi",
+      "endpoint": "phone-ios-app",
+      "follower": false
+    },
+    {
+      "role": "bass",
+      "site": "kaohsiung",
+      "access": "wifi",
+      "endpoint": "phone-ios-app",
+      "follower": false
+    }
+  ],
+  "endpoint": {
+    "name": "native-interface",
+    "capture_ms": 1.33,
+    "playback_ms": 1.33,
+    "converter_ms": 0.5,
+    "codec_extra_ms": 0.0,
+    "processing_ms": 0.0,
+    "min_jitter_ms": 0.0,
+    "provenance": "Assumed"
+  },
+  "cross_isp": false,
+  "bpm": 120.0,
+  "bars": 32,
+  "pipeline": {
+    "evidence_level": "Simulation",
+    "note": "Simulated pipeline with ASSUMED link/endpoint profiles. Not a measurement of any real network or device.",
+    "frame_ms": 2.6666666666666665,
+    "duration_ms": 20000.0,
+    "seed": 1,
+    "topology": "forward",
+    "peers": [
+      {
+        "name": "drums@taipei/wifi/phone-ios-app",
+        "link": {
+          "name": "taipei/wifi",
+          "base_ms": 4.5,
+          "jitter_mean_ms": 3.3,
+          "loss": 0.0050000000000000044,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "phone-ios-app",
+          "capture_ms": 5.33,
+          "playback_ms": 5.33,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 0.0,
+          "processing_ms": 0.5,
+          "min_jitter_ms": 0.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 3,
+        "coverage": 0.95,
+        "redundancy": 2
+      },
+      {
+        "name": "bass@kaohsiung/wifi/phone-ios-app",
+        "link": {
+          "name": "kaohsiung/wifi",
+          "base_ms": 4.3,
+          "jitter_mean_ms": 3.3,
+          "loss": 0.0050000000000000044,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "phone-ios-app",
+          "capture_ms": 5.33,
+          "playback_ms": 5.33,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 0.0,
+          "processing_ms": 0.5,
+          "min_jitter_ms": 0.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 3,
+        "coverage": 0.95,
+        "redundancy": 2
+      }
+    ],
+    "pairs": [
+      {
+        "from": "drums@taipei/wifi/phone-ios-app",
+        "to": "bass@kaohsiung/wifi/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 24.66666666666591,
+          "p50_ms": 24.66666666666606,
+          "p95_ms": 24.666666666666515,
+          "max_ms": 24.666666666666664
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 37.82666666666606,
+        "mouth_to_ear_p95_ms": 37.82666666666651,
+        "analytic_budget_ms": 45.89333333333334,
+        "concealed_pct": 1.0279001468428781,
+        "dropouts_per_min": 225.0,
+        "audible_dropouts_per_min": 0.0
+      },
+      {
+        "from": "bass@kaohsiung/wifi/phone-ios-app",
+        "to": "drums@taipei/wifi/phone-ios-app",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 24.666666666666714,
+          "p50_ms": 24.66666666666663,
+          "p95_ms": 24.66666666666788,
+          "max_ms": 24.66666666666788
+        },
+        "device_ms": 13.16,
+        "mouth_to_ear_p50_ms": 37.826666666666625,
+        "mouth_to_ear_p95_ms": 37.826666666667876,
+        "analytic_budget_ms": 45.89333333333334,
+        "concealed_pct": 1.014550794286477,
+        "dropouts_per_min": 225.0,
+        "audible_dropouts_per_min": 0.0
+      }
+    ],
+    "relay_jitter": [],
+    "client_jitter": [
+      {
+        "received": 7418,
+        "played": 7415,
+        "concealed": 76,
+        "late_dropped": 1357,
+        "overflow_dropped": 0,
+        "duplicates": 6065,
+        "resets": 0,
+        "dropouts": 75,
+        "audible_dropouts": 0
+      },
+      {
+        "received": 7417,
+        "played": 7414,
+        "concealed": 77,
+        "late_dropped": 1364,
+        "overflow_dropped": 0,
+        "duplicates": 6063,
+        "resets": 0,
+        "dropouts": 75,
+        "audible_dropouts": 0
+      }
+    ]
+  },
+  "latency_matrix_ms": [
+    [
+      0.0,
+      37.82666666666606
+    ],
+    [
+      37.826666666666625,
+      0.0
+    ]
+  ],
+  "ensemble_runs": 20,
+  "tight_fraction": 0.0,
+  "playable_or_better_fraction": 0.0,
+  "mean_tempo_drift_pct": -2.7714079185086695,
+  "mean_worst_heard_rms_ms": 48.972516637165384,
+  "coverage": 0.95,
+  "redundancy": 2,
+  "worst_dropouts_per_min": 225.0,
+  "worst_audible_dropouts_per_min": 0.0,
+  "worst_concealed_pct": 1.0279001468428781,
+  "thresholds": {
+    "tight_drift_pct": 2.0,
+    "tight_heard_rms_ms": 30.0,
+    "playable_drift_pct": 5.0,
+    "playable_heard_rms_ms": 45.0
+  },
+  "example_run": {
+    "evidence_level": "Simulation",
+    "target_bpm": 120.0,
+    "start_bpm": 117.58255119240846,
+    "end_bpm": 115.55602502268964,
+    "tempo_drift_pct": -3.703312481091968,
+    "worst_heard_rms_ms": 49.043616998235684,
+    "onset_spread_sd_ms": 6.6269457368078255,
+    "causality_warning": false,
+    "verdict": "Struggling",
+    "thresholds": {
+      "tight_drift_pct": 2.0,
+      "tight_heard_rms_ms": 30.0,
+      "playable_drift_pct": 5.0,
+      "playable_heard_rms_ms": 45.0
+    },
+    "players": [
+      {
+        "name": "drums@taipei/wifi/phone-ios-app",
+        "role": "drums",
+        "heard_rms_async_ms": 49.043616998235684,
+        "heard_mean_async_ms": 47.24625958118599
+      },
+      {
+        "name": "bass@kaohsiung/wifi/phone-ios-app",
+        "role": "bass",
+        "heard_rms_async_ms": 31.305417470732465,
+        "heard_mean_async_ms": 28.407073752148758
+      }
+    ],
+    "heard_offset_ms": [
+      [
+        0.0,
+        28.407073752148758
+      ],
+      [
+        47.24625958118599,
+        0.0
+      ]
+    ],
+    "heard_rms_ms": [
+      [
+        0.0,
+        31.305417470732465
+      ],
+      [
+        49.043616998235684,
+        0.0
+      ]
+    ]
+  }
+}

@@ -40,13 +40,19 @@ stop gate; simulations never substitute for measurement.
   whether a 4G player can play to an early click while hearing the band late
 - Better packet-loss concealment than repeat-and-fade
 
-## ECHLUB-PHONE-TERMINAL-01
+## ECHLUB-PHONE-TERMINAL-01 (iOS first, ADR-0007)
 
-- Native phone client (iOS Core Audio; Android AAudio/Oboe) on the jam core
+- Native iOS client on the jam core (Core Audio, `.measurement` mode,
+  128/256-frame buffers, wired monitoring only); Android later
 - On-device loopback latency measurement; detect Android low-latency
   support; refuse or warn on Bluetooth output
 - Optional USB-C Ethernet and USB audio interface support
 - Replace the assumed `phone-*` endpoint profiles with measurements
+
+## ECHLUB-IPHONE-JAM-EXPERIMENT-01
+
+- Staged all-iPhone experiment (loopback → duo → 4-piece; Ethernet → Wi-Fi
+  → 5G SA) testing the simulation's predictions
 
 ## ECHLUB-JAM-DEVICE-SELF-CHECK-01
 
