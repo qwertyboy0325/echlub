@@ -104,8 +104,27 @@ pub struct EnsembleReport {
     pub verdict: Verdict,
     pub thresholds: Thresholds,
     pub players: Vec<PlayerResult>,
+    /// `[from][to]`: mean of (heard `from` onset - own `to` onset).
+    pub heard_offset_ms: Vec<Vec<f64>>,
+    /// `[from][to]`: RMS of the same.
+    pub heard_rms_ms: Vec<Vec<f64>>,
     #[serde(skip)]
     pub onsets_ms: Vec<Vec<f64>>,
+}
+
+impl EnsembleReport {
+    /// Worst heard RMS among pairs where neither side is in `exclude`.
+    pub fn worst_heard_rms_excluding(&self, exclude: &[usize]) -> f64 {
+        let mut worst = 0.0f64;
+        for (from, row) in self.heard_rms_ms.iter().enumerate() {
+            for (to, rms) in row.iter().enumerate() {
+                if from != to && !exclude.contains(&from) && !exclude.contains(&to) {
+                    worst = worst.max(*rms);
+                }
+            }
+        }
+        worst
+    }
 }
 
 pub fn simulate(config: &EnsembleConfig) -> EnsembleReport {
@@ -141,7 +160,7 @@ pub fn simulate(config: &EnsembleConfig) -> EnsembleReport {
     let weight_sum = |i: usize| -> f64 {
         (0..n)
             .filter(|j| *j != i)
-            .map(|j| config.players[j].role.listen_weight())
+            .map(|j| config.players[j].listen_weight)
             .sum()
     };
 
@@ -154,7 +173,7 @@ pub fn simulate(config: &EnsembleConfig) -> EnsembleReport {
                 let mut heard = 0.0;
                 let mut lat = 0.0;
                 for j in (0..n).filter(|j| *j != i) {
-                    let w = config.players[j].role.listen_weight();
+                    let w = config.players[j].listen_weight;
                     heard += w * (actual[j][k] + l[j][i]);
                     lat += w * l[j][i];
                     if l[j][i] > period[i] / 2.0 {
@@ -219,6 +238,20 @@ fn report(
         })
         .collect();
 
+    let settled = 4.min(beats - 1);
+    let mut heard_offset_ms = vec![vec![0.0; n]; n];
+    let mut heard_rms_ms = vec![vec![0.0; n]; n];
+    for from in 0..n {
+        for to in (0..n).filter(|t| *t != from) {
+            let e: Vec<f64> = (settled..beats)
+                .map(|k| actual[from][k] + config.latency_ms[from][to] - actual[to][k])
+                .collect();
+            let len = e.len().max(1) as f64;
+            heard_offset_ms[from][to] = e.iter().sum::<f64>() / len;
+            heard_rms_ms[from][to] = (e.iter().map(|x| x * x).sum::<f64>() / len).sqrt();
+        }
+    }
+
     let onset_spread_sd_ms = (0..beats)
         .map(|k| {
             let m = mean_onset[k];
@@ -259,6 +292,8 @@ fn report(
         verdict,
         thresholds: th,
         players,
+        heard_offset_ms,
+        heard_rms_ms,
         onsets_ms: actual,
     }
 }
@@ -356,6 +391,32 @@ mod tests {
     fn anticipation_absorbs_small_latency() {
         let rows = sweep_uniform_latency(&[10.0], 120.0, 32, 20, 0.0);
         assert!(rows[0].mean_tempo_drift_pct.abs() < 1.0, "{rows:?}");
+    }
+
+    #[test]
+    fn follower_arrangement_protects_band_tempo() {
+        let slow_vocals = |follower: bool| {
+            let mut cfg = EnsembleConfig::rock_uniform(15.0, 120.0, 32, 0);
+            for row in 0..4 {
+                if row != 3 {
+                    cfg.latency_ms[3][row] = 90.0;
+                    cfg.latency_ms[row][3] = 90.0;
+                }
+            }
+            if follower {
+                cfg.players[3] = cfg.players[3].clone().as_follower();
+            }
+            (0..10u64)
+                .map(|seed| {
+                    cfg.seed = seed;
+                    simulate(&cfg).tempo_drift_pct
+                })
+                .sum::<f64>()
+                / 10.0
+        };
+        let normal = slow_vocals(false);
+        let follow = slow_vocals(true);
+        assert!(follow.abs() < normal.abs() - 0.5, "{follow} vs {normal}");
     }
 
     #[test]

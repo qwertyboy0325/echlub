@@ -6,17 +6,23 @@
     {
       "role": "drums",
       "site": "taipei",
-      "access": "fiber-wired"
+      "access": "fiber-wired",
+      "endpoint": null,
+      "follower": false
     },
     {
       "role": "bass",
       "site": "taichung",
-      "access": "fiber-wired"
+      "access": "fiber-wired",
+      "endpoint": null,
+      "follower": false
     },
     {
       "role": "guitar",
       "site": "kaohsiung",
-      "access": "cable-wired"
+      "access": "cable-wired",
+      "endpoint": null,
+      "follower": false
     }
   ],
   "endpoint": {
@@ -59,7 +65,9 @@
           "min_jitter_ms": 0.0,
           "provenance": "Assumed"
         },
-        "jitter_depth": 3
+        "jitter_depth": 3,
+        "coverage": 0.99,
+        "redundancy": 1
       },
       {
         "name": "bass@taichung/fiber-wired",
@@ -80,7 +88,9 @@
           "min_jitter_ms": 0.0,
           "provenance": "Assumed"
         },
-        "jitter_depth": 2
+        "jitter_depth": 2,
+        "coverage": 0.99,
+        "redundancy": 1
       },
       {
         "name": "guitar@kaohsiung/cable-wired",
@@ -101,7 +111,9 @@
           "min_jitter_ms": 0.0,
           "provenance": "Assumed"
         },
-        "jitter_depth": 5
+        "jitter_depth": 5,
+        "coverage": 0.99,
+        "redundancy": 1
       }
     ],
     "pairs": [
@@ -120,7 +132,10 @@
         "device_ms": 23.0,
         "mouth_to_ear_p50_ms": 39.66666666666606,
         "mouth_to_ear_p95_ms": 39.66666666666663,
-        "analytic_budget_ms": 48.06666666666667
+        "analytic_budget_ms": 48.06666666666667,
+        "concealed_pct": 0.40012804552932363,
+        "dropouts_per_min": 90.0,
+        "audible_dropouts_per_min": 0.0
       },
       {
         "from": "drums@taipei/fiber-wired",
@@ -137,7 +152,10 @@
         "device_ms": 23.0,
         "mouth_to_ear_p50_ms": 55.66666666666606,
         "mouth_to_ear_p95_ms": 55.666666666666515,
-        "analytic_budget_ms": 61.86666666666667
+        "analytic_budget_ms": 61.86666666666667,
+        "concealed_pct": 0.18682325537136446,
+        "dropouts_per_min": 42.0,
+        "audible_dropouts_per_min": 0.0
       },
       {
         "from": "bass@taichung/fiber-wired",
@@ -154,7 +172,10 @@
         "device_ms": 23.0,
         "mouth_to_ear_p50_ms": 44.999999999999545,
         "mouth_to_ear_p95_ms": 45.0,
-        "analytic_budget_ms": 48.06666666666668
+        "analytic_budget_ms": 48.06666666666668,
+        "concealed_pct": 0.08004625021011295,
+        "dropouts_per_min": 18.0,
+        "audible_dropouts_per_min": 0.0
       },
       {
         "from": "bass@taichung/fiber-wired",
@@ -171,7 +192,10 @@
         "device_ms": 23.0,
         "mouth_to_ear_p50_ms": 52.999999999999545,
         "mouth_to_ear_p95_ms": 53.0,
-        "analytic_budget_ms": 57.40000000000001
+        "analytic_budget_ms": 57.40000000000001,
+        "concealed_pct": 0.13345790353870682,
+        "dropouts_per_min": 30.0,
+        "audible_dropouts_per_min": 0.0
       },
       {
         "from": "guitar@kaohsiung/cable-wired",
@@ -188,7 +212,10 @@
         "device_ms": 23.0,
         "mouth_to_ear_p50_ms": 58.333333333333485,
         "mouth_to_ear_p95_ms": 58.33333333333394,
-        "analytic_budget_ms": 61.86666666666667
+        "analytic_budget_ms": 61.86666666666667,
+        "concealed_pct": 0.20019219077177985,
+        "dropouts_per_min": 45.0,
+        "audible_dropouts_per_min": 0.0
       },
       {
         "from": "guitar@kaohsiung/cable-wired",
@@ -205,7 +232,10 @@
         "device_ms": 23.0,
         "mouth_to_ear_p50_ms": 50.333333333333485,
         "mouth_to_ear_p95_ms": 50.33333333333394,
-        "analytic_budget_ms": 57.4
+        "analytic_budget_ms": 57.4,
+        "concealed_pct": 0.4669086342583329,
+        "dropouts_per_min": 105.0,
+        "audible_dropouts_per_min": 0.0
       }
     ],
     "relay_jitter": [
@@ -216,7 +246,9 @@
         "late_dropped": 0,
         "overflow_dropped": 0,
         "duplicates": 0,
-        "resets": 0
+        "resets": 0,
+        "dropouts": 6,
+        "audible_dropouts": 0
       },
       {
         "received": 7496,
@@ -225,7 +257,9 @@
         "late_dropped": 0,
         "overflow_dropped": 0,
         "duplicates": 0,
-        "resets": 0
+        "resets": 0,
+        "dropouts": 2,
+        "audible_dropouts": 0
       },
       {
         "received": 7486,
@@ -234,7 +268,9 @@
         "late_dropped": 4,
         "overflow_dropped": 0,
         "duplicates": 0,
-        "resets": 0
+        "resets": 0,
+        "dropouts": 11,
+        "audible_dropouts": 0
       }
     ],
     "client_jitter": [
@@ -245,7 +281,9 @@
         "late_dropped": 0,
         "overflow_dropped": 0,
         "duplicates": 0,
-        "resets": 0
+        "resets": 0,
+        "dropouts": 4,
+        "audible_dropouts": 0
       },
       {
         "received": 7475,
@@ -254,7 +292,9 @@
         "late_dropped": 21,
         "overflow_dropped": 0,
         "duplicates": 0,
-        "resets": 0
+        "resets": 0,
+        "dropouts": 24,
+        "audible_dropouts": 0
       },
       {
         "received": 7489,
@@ -263,7 +303,9 @@
         "late_dropped": 2,
         "overflow_dropped": 0,
         "duplicates": 0,
-        "resets": 0
+        "resets": 0,
+        "dropouts": 8,
+        "audible_dropouts": 0
       }
     ]
   },
@@ -289,6 +331,11 @@
   "playable_or_better_fraction": 0.0,
   "mean_tempo_drift_pct": -4.000834486578726,
   "mean_worst_heard_rms_ms": 70.71105423531864,
+  "coverage": 0.99,
+  "redundancy": 1,
+  "worst_dropouts_per_min": 105.0,
+  "worst_audible_dropouts_per_min": 0.0,
+  "worst_concealed_pct": 0.4669086342583329,
   "thresholds": {
     "tight_drift_pct": 2.0,
     "tight_heard_rms_ms": 30.0,
@@ -330,6 +377,40 @@
         "heard_rms_async_ms": 43.409942317918905,
         "heard_mean_async_ms": 40.421861719343944
       }
+    ],
+    "heard_offset_ms": [
+      [
+        0.0,
+        26.960200245894292,
+        35.40196184229112
+      ],
+      [
+        57.706466420770894,
+        0.0,
+        45.44176159639677
+      ],
+      [
+        78.59803815770836,
+        57.891571736937415,
+        0.0
+      ]
+    ],
+    "heard_rms_ms": [
+      [
+        0.0,
+        30.537448027996778,
+        38.82508622452237
+      ],
+      [
+        59.461917237299375,
+        0.0,
+        47.55479853546325
+      ],
+      [
+        80.19812978055747,
+        59.56458045632243,
+        0.0
+      ]
     ]
   }
 }

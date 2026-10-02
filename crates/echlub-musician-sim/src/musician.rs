@@ -63,6 +63,8 @@ pub struct MusicianParams {
     /// Fraction of known incoming latency the player consciously discounts
     /// (0 = naive, 1 = perfect "play ahead of what you hear").
     pub latency_compensation: f64,
+    /// How strongly the others lock to this player.
+    pub listen_weight: f64,
 }
 
 impl MusicianParams {
@@ -83,6 +85,14 @@ impl MusicianParams {
             timekeeper_sd_ms: tk,
             motor_sd_ms: motor,
             latency_compensation: 0.0,
+            listen_weight: role.listen_weight(),
         }
+    }
+
+    /// Arrangement for a player on a slow link: the band keeps time among
+    /// themselves and largely ignores this player, who follows the band.
+    pub fn as_follower(mut self) -> Self {
+        self.listen_weight *= 0.05;
+        self
     }
 }

@@ -7,7 +7,9 @@ use echlub_jam::pipeline::LatencyStats;
 use echlub_musician_sim::ensemble::SweepRow;
 
 use crate::bots::BandResult;
-use crate::scenario::ScenarioReport;
+use crate::scenario::{
+    MobileStudyRow, ScenarioReport, CLEAN_DROPOUTS_PER_MIN, NOTICEABLE_DROPOUTS_PER_MIN,
+};
 
 pub const SIM_BANNER: &str = "> **SIMULATION.** All network, device, and musician parameters are assumed planning values, not measurements. No latency claim about real networks or people follows from this report.";
 
@@ -29,18 +31,24 @@ pub fn scenario_markdown(r: &ScenarioReport) -> String {
             p.link.expected_ms()
         );
     }
-    let _ = writeln!(s, "\n## Mouth-to-ear latency (pipeline simulation + analytic device budget)\n\n| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected |\n| --- | --- | --- | --- | --- |");
+    let _ = writeln!(
+        s,
+        "\n## Mouth-to-ear latency (pipeline simulation + analytic device budget)\n\nJitter-buffer coverage: {:.1}%\n\n| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected | Concealed | Dropouts/min |\n| --- | --- | --- | --- | --- | --- | --- |",
+        r.coverage * 100.0
+    );
     for p in &r.pipeline.pairs {
         let _ = writeln!(
             s,
-            "| {} → {} | {} | {} | {:.1} | {}/{} |",
+            "| {} → {} | {} | {} | {:.1} | {}/{} | {:.2}% | {:.1} |",
             p.from,
             p.to,
             fmt_opt(p.mouth_to_ear_p50_ms),
             fmt_opt(p.mouth_to_ear_p95_ms),
             p.analytic_budget_ms,
             p.detected_probes,
-            p.expected_probes
+            p.expected_probes,
+            p.concealed_pct,
+            p.dropouts_per_min
         );
     }
     let _ = writeln!(
@@ -157,6 +165,45 @@ pub fn band_markdown(r: &BandResult, peers: usize, label: &str) -> String {
             s,
             "\nRelay: {} ticks, {} late, {} packets in, {} out, {} decode errors.",
             relay.ticks, relay.late_ticks, relay.packets_in, relay.packets_out, relay.decode_errors
+        );
+    }
+    s
+}
+
+pub fn mobile_study_markdown(rows: &[MobileStudyRow]) -> String {
+    let mut s = String::new();
+    let role = rows.first().map(|r| r.mobile_role.name()).unwrap_or("?");
+    let _ = writeln!(
+        s,
+        "# Mobile-player remedies: {role} on a mobile link, rest of a 4-piece on wired fibre\n\n{SIM_BANNER}\n\n\
+Topology `forward`. **Coverage**: share of packets the jitter buffer is sized to catch in time (lower = less latency, more dropouts). \
+**Copies**: each frame sent this many times. **Arrangement**: `Normal` (everyone listens to everyone), `Follower` (band ignores the mobile player's timing), `FollowerClickAhead` (follower plus a synced click played early for the mobile player; human feasibility unverified). \
+**Audible dropouts**: concealment gaps of ≥ 8 ms per minute on paths touching the mobile player (hypothesis: ≤ {CLEAN_DROPOUTS_PER_MIN} clean, ≤ {NOTICEABLE_DROPOUTS_PER_MIN} noticeable). \
+**Sounds late**: how far behind the beat the mobile player sounds to the wired players. \
+Outcomes: `FullBand` = everyone playable; `OnTimeViaClick` = band hears the mobile player on the beat, mobile player hears the band about a round trip late and plays to the click; `CoreOkMobileBehind` = wired players fine, mobile player follows but sounds late; `NotUsable`.\n\n\
+| Access | Device | Copies | Coverage | Arrangement | Mobile path (ms) | Core path (ms) | Audible dropouts/min | Tempo drift | Band playable | Core playable | Mobile sounds late to band (ms) | Band sounds late to mobile (ms) | Up / down (Mbit/s) | Outcome |\n\
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+    );
+    for r in rows {
+        let _ = writeln!(
+            s,
+            "| {} | {} | {} | {:.0}% | {:?} | {:.1} | {:.1} | {:.1} | {:+.2}% | {:.0}% | {:.0}% | {:.0} | {:.0} | {:.1} / {:.1} | {:?} |",
+            r.access.name(),
+            r.endpoint,
+            r.redundancy,
+            r.coverage * 100.0,
+            r.arrangement,
+            r.mobile_path_ms,
+            r.core_path_ms,
+            r.mobile_audible_dropouts_per_min,
+            r.mean_tempo_drift_pct,
+            r.band_playable_fraction * 100.0,
+            r.core_playable_fraction * 100.0,
+            r.mobile_sounds_late_ms,
+            r.band_sounds_late_to_mobile_ms,
+            r.mobile_uplink_kbps / 1000.0,
+            r.mobile_downlink_kbps / 1000.0,
+            r.outcome
         );
     }
     s

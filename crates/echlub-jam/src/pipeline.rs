@@ -74,6 +74,12 @@ pub struct PairResult {
     pub mouth_to_ear_p95_ms: Option<f64>,
     /// Analytic budget for comparison with the measured value.
     pub analytic_budget_ms: f64,
+    /// Share of this path's frames replaced by concealment (late or lost).
+    pub concealed_pct: f64,
+    /// Separate concealment runs per minute on this path.
+    pub dropouts_per_min: f64,
+    /// Runs of at least `AUDIBLE_DROPOUT_FRAMES` per minute.
+    pub audible_dropouts_per_min: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -153,15 +159,7 @@ fn drain(queue: &mut BinaryHeap<Delivery>, until: f64, buffers: &mut [Vec<Jitter
 }
 
 fn sum_stats(stats: impl Iterator<Item = JitterStats>) -> JitterStats {
-    stats.fold(JitterStats::default(), |a, b| JitterStats {
-        received: a.received + b.received,
-        played: a.played + b.played,
-        concealed: a.concealed + b.concealed,
-        late_dropped: a.late_dropped + b.late_dropped,
-        overflow_dropped: a.overflow_dropped + b.overflow_dropped,
-        duplicates: a.duplicates + b.duplicates,
-        resets: a.resets + b.resets,
-    })
+    stats.fold(JitterStats::default(), JitterStats::merge)
 }
 
 pub fn run(config: &PipelineConfig) -> PipelineReport {
@@ -248,14 +246,16 @@ pub fn run(config: &PipelineConfig) -> PipelineReport {
             drain(&mut up_q, tr, &mut relay_jb);
             let inputs: Vec<Vec<i16>> = relay_jb.iter_mut().map(|jb| jb[0].pop().1).collect();
             for (j, mix) in mix_minus(&inputs, FRAME_SAMPLES).into_iter().enumerate() {
-                if let Some(transit) = down[j].transit_ms() {
-                    down_q.push(Delivery {
-                        at: tr + transit,
-                        target: j,
-                        slot: 0,
-                        seq,
-                        samples: mix,
-                    });
+                for _ in 0..peers[j].redundancy {
+                    if let Some(transit) = down[j].transit_ms() {
+                        down_q.push(Delivery {
+                            at: tr + transit,
+                            target: j,
+                            slot: 0,
+                            seq,
+                            samples: mix.clone(),
+                        });
+                    }
                 }
             }
         }
@@ -263,30 +263,33 @@ pub fn run(config: &PipelineConfig) -> PipelineReport {
         let ts = t0 + p;
         for (i, link) in up.iter_mut().enumerate() {
             let samples = probe.render(i, k * FRAME_SAMPLES as u64, FRAME_SAMPLES);
-            let Some(transit) = link.transit_ms() else {
-                continue;
-            };
-            if forward {
-                // Relay forwards on arrival; each listener gets its own copy.
-                for j in (0..n).filter(|j| *j != i) {
-                    if let Some(back) = down[j].transit_ms() {
-                        down_q.push(Delivery {
-                            at: ts + transit + back,
-                            target: j,
-                            slot: i,
-                            seq,
-                            samples: samples.clone(),
-                        });
+            // Each redundant copy takes its own trip.
+            for _ in 0..peers[i].redundancy {
+                let Some(transit) = link.transit_ms() else {
+                    continue;
+                };
+                if forward {
+                    // Relay forwards on arrival; each listener gets its own copy.
+                    for j in (0..n).filter(|j| *j != i) {
+                        if let Some(back) = down[j].transit_ms() {
+                            down_q.push(Delivery {
+                                at: ts + transit + back,
+                                target: j,
+                                slot: i,
+                                seq,
+                                samples: samples.clone(),
+                            });
+                        }
                     }
+                } else {
+                    up_q.push(Delivery {
+                        at: ts + transit,
+                        target: i,
+                        slot: 0,
+                        seq,
+                        samples: samples.clone(),
+                    });
                 }
-            } else {
-                up_q.push(Delivery {
-                    at: ts + transit,
-                    target: i,
-                    slot: 0,
-                    seq,
-                    samples,
-                });
             }
         }
     }
@@ -301,6 +304,18 @@ pub fn run(config: &PipelineConfig) -> PipelineReport {
             let dst = &config.peers[to];
             let stats = LatencyStats::from_samples(&heard_from[to]);
             let dev = device_ms(src, dst);
+            // In mix mode a dropout in the relay's buffer for `from` or in
+            // `to`'s mix buffer both silence this path.
+            let path_stats = if forward {
+                client_jb[to][from].stats()
+            } else {
+                relay_jb[from][0].stats().merge(client_jb[to][0].stats())
+            };
+            let concealed_pct = if forward {
+                path_stats.concealed_pct()
+            } else {
+                relay_jb[from][0].stats().concealed_pct() + client_jb[to][0].stats().concealed_pct()
+            };
             pairs.push(PairResult {
                 from: src.name.clone(),
                 to: dst.name.clone(),
@@ -311,6 +326,10 @@ pub fn run(config: &PipelineConfig) -> PipelineReport {
                 network_path: stats,
                 device_ms: dev,
                 analytic_budget_ms: star_path(src, dst, config.topology).total_ms,
+                concealed_pct,
+                dropouts_per_min: path_stats.dropouts as f64 * 60_000.0 / config.duration_ms,
+                audible_dropouts_per_min: path_stats.audible_dropouts as f64 * 60_000.0
+                    / config.duration_ms,
             });
         }
     }
@@ -422,6 +441,50 @@ mod tests {
             topology: Topology::Mix,
         });
         assert!(report.client_jitter.iter().any(|s| s.concealed > 0));
+    }
+
+    #[test]
+    fn lower_coverage_trades_dropouts_for_latency() {
+        let jittery = LinkProfile::new("jittery", 10.0, 8.0, 0.0);
+        let ep = || EndpointProfile::preset("native-interface").unwrap();
+        let run_at = |coverage| {
+            run(&PipelineConfig {
+                peers: vec![
+                    PeerSetup::with_coverage("a", jittery.clone(), ep(), coverage),
+                    PeerSetup::with_coverage("b", jittery.clone(), ep(), coverage),
+                ],
+                duration_ms: 20_000.0,
+                seed: 9,
+                topology: Topology::Forward,
+            })
+        };
+        let safe = run_at(0.999);
+        let fast = run_at(0.9);
+        let (s, f) = (&safe.pairs[0], &fast.pairs[0]);
+        assert!(f.mouth_to_ear_p50_ms.unwrap() < s.mouth_to_ear_p50_ms.unwrap() - 10.0);
+        assert!(f.dropouts_per_min > s.dropouts_per_min, "{f:?} vs {s:?}");
+    }
+
+    #[test]
+    fn redundancy_cuts_dropouts() {
+        let lossy = LinkProfile::new("lossy", 5.0, 3.0, 0.02);
+        let ep = || EndpointProfile::preset("native-interface").unwrap();
+        let run_with = |copies| {
+            let peer = |n| PeerSetup::auto(n, lossy.clone(), ep()).with_redundancy(copies);
+            run(&PipelineConfig {
+                peers: vec![peer("a"), peer("b")],
+                duration_ms: 20_000.0,
+                seed: 4,
+                topology: Topology::Forward,
+            })
+        };
+        let single = &run_with(1).pairs[0];
+        let double = &run_with(2).pairs[0];
+        assert!(
+            double.concealed_pct < single.concealed_pct / 3.0,
+            "{double:?} vs {single:?}"
+        );
+        assert!(double.mouth_to_ear_p50_ms.unwrap() <= single.mouth_to_ear_p50_ms.unwrap());
     }
 
     #[test]

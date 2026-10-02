@@ -37,6 +37,20 @@ receive processing + playback buffer + DAC.
 measures the network-and-buffer part from probe clicks in the played-out
 audio and adds the device part analytically.
 
+## Loss and jitter remedies
+
+- **Coverage:** jitter buffers are sized to catch a chosen fraction of
+  packets in time (`PeerSetup::with_coverage`, default 99%). Lower coverage
+  means less latency and more dropouts.
+- **Redundancy:** each frame can be sent `n` times
+  (`PeerSetup::with_redundancy`); listeners keep the first copy. Buffers are
+  sized for the best-of-copies link.
+- **Concealment:** `Silence` or `RepeatFade` (repeat last frame, halving per
+  missing frame). Gaps of ≥ 3 frames (8 ms) count as audible dropouts; that
+  threshold is a hypothesis to verify by ear.
+- **Arrangements for a slow player:** `Follower` (band does not lock to them)
+  and `FollowerClickAhead` (a synced click played early by their round trip).
+
 ## Simulated musicians
 
 Per beat, each player updates its next onset and its tempo from the
@@ -59,7 +73,12 @@ real players.
 
 - No clock drift between devices; no packet-loss concealment beyond silence.
 - No codec (Opus) yet; bandwidth is raw PCM.
-- Fixed-depth jitter buffers chosen from assumed p99 jitter; no adaptation.
+- Fixed-depth jitter buffers chosen from assumed jitter quantiles; no
+  adaptation.
+- Redundant copies are modelled as independent trips; real cellular loss
+  is bursty, which weakens simple duplication. Real-time bots do not send
+  redundant copies yet.
+- Click-ahead assumes a clock-synced click that does not exist yet.
 - Real-time bots share one process clock; their latency numbers describe the
   host machine plus injected impairment only.
 - Socket read timeouts are too coarse on some platforms (≈8 ms in this

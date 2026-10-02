@@ -18,7 +18,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use echlub_jam::jitter::{JitterBuffer, JitterStats};
+use echlub_jam::jitter::{Concealment, JitterBuffer, JitterStats};
 use echlub_jam::netsim::{ImpairedLink, LinkProfile};
 use echlub_jam::packet::{AudioFrame, Packet};
 use echlub_jam::probe::{OnsetDetector, ProbeSchedule};
@@ -132,6 +132,11 @@ pub fn run_bot(config: BotConfig, epoch: Instant) -> io::Result<BotResult> {
     let mut down = ImpairedLink::new(config.link.clone(), config.seed.wrapping_mul(2) + 1);
     // One buffer per sender: the relay's mix id in mix mode, each peer in forward mode.
     let mut buffers: BTreeMap<u8, JitterBuffer> = BTreeMap::new();
+    // Probe clicks must not be smeared by concealment; music gets the softer fill.
+    let concealment = match config.mode {
+        BotMode::Probe => Concealment::Silence,
+        BotMode::Music { .. } => Concealment::RepeatFade,
+    };
     let mut detector = OnsetDetector::new(4_000, 50.0);
     let mut outbox: BinaryHeap<Scheduled> = BinaryHeap::new();
     let mut inbox: BinaryHeap<Scheduled> = BinaryHeap::new();
@@ -161,7 +166,7 @@ pub fn run_bot(config: BotConfig, epoch: Instant) -> io::Result<BotResult> {
                             .jitter_depths
                             .get(f.peer_id as usize)
                             .unwrap_or(&config.jitter_depths[me]);
-                        JitterBuffer::new(*depth, FRAME_SAMPLES)
+                        JitterBuffer::new(*depth, FRAME_SAMPLES).with_concealment(concealment)
                     })
                     .push(f.seq, f.samples);
             }
@@ -264,19 +269,10 @@ pub fn run_bot(config: BotConfig, epoch: Instant) -> io::Result<BotResult> {
         }
         .encode(),
     );
-    result.jitter =
-        buffers
-            .values()
-            .map(JitterBuffer::stats)
-            .fold(JitterStats::default(), |a, b| JitterStats {
-                received: a.received + b.received,
-                played: a.played + b.played,
-                concealed: a.concealed + b.concealed,
-                late_dropped: a.late_dropped + b.late_dropped,
-                overflow_dropped: a.overflow_dropped + b.overflow_dropped,
-                duplicates: a.duplicates + b.duplicates,
-                resets: a.resets + b.resets,
-            });
+    result.jitter = buffers
+        .values()
+        .map(JitterBuffer::stats)
+        .fold(JitterStats::default(), JitterStats::merge);
     Ok(result)
 }
 

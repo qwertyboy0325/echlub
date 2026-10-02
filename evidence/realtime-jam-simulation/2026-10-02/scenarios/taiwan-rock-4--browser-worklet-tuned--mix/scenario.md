@@ -19,20 +19,22 @@
 
 ## Mouth-to-ear latency (pipeline simulation + analytic device budget)
 
-| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected |
-| --- | --- | --- | --- | --- |
-| drums@taipei/fiber-wired → bass@taichung/fiber-wired | 39.7 | 39.7 | 48.1 | 20/20 |
-| drums@taipei/fiber-wired → guitar@tainan/cable-wired | 55.7 | 55.7 | 61.4 | 20/20 |
-| drums@taipei/fiber-wired → vocals@hualien/wifi | 66.3 | 66.3 | 71.9 | 20/20 |
-| bass@taichung/fiber-wired → drums@taipei/fiber-wired | 45.0 | 45.0 | 48.1 | 20/20 |
-| bass@taichung/fiber-wired → guitar@tainan/cable-wired | 53.0 | 53.0 | 56.9 | 20/20 |
-| bass@taichung/fiber-wired → vocals@hualien/wifi | 63.7 | 63.7 | 67.4 | 20/20 |
-| guitar@tainan/cable-wired → drums@taipei/fiber-wired | 58.3 | 58.3 | 61.4 | 20/20 |
-| guitar@tainan/cable-wired → bass@taichung/fiber-wired | 50.3 | 50.3 | 56.9 | 20/20 |
-| guitar@tainan/cable-wired → vocals@hualien/wifi | 77.0 | 77.0 | 80.7 | 19/20 |
-| vocals@hualien/wifi → drums@taipei/fiber-wired | 69.0 | 69.0 | 71.9 | 19/19 |
-| vocals@hualien/wifi → bass@taichung/fiber-wired | 61.0 | 61.0 | 67.4 | 19/19 |
-| vocals@hualien/wifi → guitar@tainan/cable-wired | 77.0 | 77.0 | 80.7 | 19/19 |
+Jitter-buffer coverage: 99.0%
+
+| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected | Concealed | Dropouts/min |
+| --- | --- | --- | --- | --- | --- | --- |
+| drums@taipei/fiber-wired → bass@taichung/fiber-wired | 39.7 | 39.7 | 48.1 | 20/20 | 0.40% | 90.0 |
+| drums@taipei/fiber-wired → guitar@tainan/cable-wired | 55.7 | 55.7 | 61.4 | 20/20 | 0.17% | 39.0 |
+| drums@taipei/fiber-wired → vocals@hualien/wifi | 66.3 | 66.3 | 71.9 | 20/20 | 0.63% | 141.0 |
+| bass@taichung/fiber-wired → drums@taipei/fiber-wired | 45.0 | 45.0 | 48.1 | 20/20 | 0.08% | 18.0 |
+| bass@taichung/fiber-wired → guitar@tainan/cable-wired | 53.0 | 53.0 | 56.9 | 20/20 | 0.12% | 27.0 |
+| bass@taichung/fiber-wired → vocals@hualien/wifi | 63.7 | 63.7 | 67.4 | 20/20 | 0.57% | 129.0 |
+| guitar@tainan/cable-wired → drums@taipei/fiber-wired | 58.3 | 58.3 | 61.4 | 20/20 | 0.19% | 42.0 |
+| guitar@tainan/cable-wired → bass@taichung/fiber-wired | 50.3 | 50.3 | 56.9 | 20/20 | 0.45% | 102.0 |
+| guitar@tainan/cable-wired → vocals@hualien/wifi | 77.0 | 77.0 | 80.7 | 19/20 | 0.68% | 153.0 |
+| vocals@hualien/wifi → drums@taipei/fiber-wired | 69.0 | 69.0 | 71.9 | 19/19 | 0.73% | 165.0 |
+| vocals@hualien/wifi → bass@taichung/fiber-wired | 61.0 | 61.0 | 67.4 | 19/19 | 1.00% | 225.0 |
+| vocals@hualien/wifi → guitar@tainan/cable-wired | 77.0 | 77.0 | 80.7 | 19/19 | 0.77% | 174.0 |
 
 ## Simulated ensemble
 

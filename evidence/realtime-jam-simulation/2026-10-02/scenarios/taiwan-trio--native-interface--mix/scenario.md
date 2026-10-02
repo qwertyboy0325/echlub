@@ -18,14 +18,16 @@
 
 ## Mouth-to-ear latency (pipeline simulation + analytic device budget)
 
-| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected |
-| --- | --- | --- | --- | --- |
-| drums@taipei/fiber-wired → bass@taichung/fiber-wired | 20.3 | 20.3 | 28.7 | 20/20 |
-| drums@taipei/fiber-wired → guitar@kaohsiung/cable-wired | 36.3 | 36.3 | 42.5 | 20/20 |
-| bass@taichung/fiber-wired → drums@taipei/fiber-wired | 25.7 | 25.7 | 28.7 | 20/20 |
-| bass@taichung/fiber-wired → guitar@kaohsiung/cable-wired | 33.7 | 33.7 | 38.1 | 20/20 |
-| guitar@kaohsiung/cable-wired → drums@taipei/fiber-wired | 39.0 | 39.0 | 42.5 | 20/20 |
-| guitar@kaohsiung/cable-wired → bass@taichung/fiber-wired | 31.0 | 31.0 | 38.1 | 20/20 |
+Jitter-buffer coverage: 99.0%
+
+| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected | Concealed | Dropouts/min |
+| --- | --- | --- | --- | --- | --- | --- |
+| drums@taipei/fiber-wired → bass@taichung/fiber-wired | 20.3 | 20.3 | 28.7 | 20/20 | 0.40% | 90.0 |
+| drums@taipei/fiber-wired → guitar@kaohsiung/cable-wired | 36.3 | 36.3 | 42.5 | 20/20 | 0.19% | 42.0 |
+| bass@taichung/fiber-wired → drums@taipei/fiber-wired | 25.7 | 25.7 | 28.7 | 20/20 | 0.08% | 18.0 |
+| bass@taichung/fiber-wired → guitar@kaohsiung/cable-wired | 33.7 | 33.7 | 38.1 | 20/20 | 0.13% | 30.0 |
+| guitar@kaohsiung/cable-wired → drums@taipei/fiber-wired | 39.0 | 39.0 | 42.5 | 20/20 | 0.20% | 45.0 |
+| guitar@kaohsiung/cable-wired → bass@taichung/fiber-wired | 31.0 | 31.0 | 38.1 | 20/20 | 0.47% | 105.0 |
 
 ## Simulated ensemble
 

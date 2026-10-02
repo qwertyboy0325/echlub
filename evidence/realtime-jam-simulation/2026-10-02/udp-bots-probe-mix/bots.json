@@ -5,15 +5,17 @@
     "frames_dropped_uplink": 3,
     "mixes_received": 2999,
     "mixes_dropped_downlink": 0,
-    "late_ticks": 53,
+    "late_ticks": 1,
     "jitter": {
-      "received": 2957,
-      "played": 2955,
-      "concealed": 41,
-      "late_dropped": 41,
+      "received": 2997,
+      "played": 2995,
+      "concealed": 1,
+      "late_dropped": 1,
       "overflow_dropped": 0,
       "duplicates": 0,
-      "resets": 0
+      "resets": 0,
+      "dropouts": 1,
+      "audible_dropouts": 0
     },
     "detections": [
       [
@@ -112,15 +114,17 @@
     "frames_dropped_uplink": 1,
     "mixes_received": 2999,
     "mixes_dropped_downlink": 1,
-    "late_ticks": 29,
+    "late_ticks": 0,
     "jitter": {
-      "received": 2961,
-      "played": 2960,
-      "concealed": 37,
-      "late_dropped": 36,
+      "received": 2997,
+      "played": 2996,
+      "concealed": 1,
+      "late_dropped": 0,
       "overflow_dropped": 0,
       "duplicates": 0,
-      "resets": 0
+      "resets": 0,
+      "dropouts": 1,
+      "audible_dropouts": 0
     },
     "detections": [
       [
@@ -219,15 +223,17 @@
     "frames_dropped_uplink": 3,
     "mixes_received": 2999,
     "mixes_dropped_downlink": 2,
-    "late_ticks": 46,
+    "late_ticks": 0,
     "jitter": {
-      "received": 2969,
-      "played": 2966,
-      "concealed": 27,
-      "late_dropped": 25,
+      "received": 2994,
+      "played": 2991,
+      "concealed": 2,
+      "late_dropped": 0,
       "overflow_dropped": 0,
       "duplicates": 0,
-      "resets": 0
+      "resets": 0,
+      "dropouts": 2,
+      "audible_dropouts": 0
     },
     "detections": [
       [
@@ -326,15 +332,17 @@
     "frames_dropped_uplink": 10,
     "mixes_received": 2999,
     "mixes_dropped_downlink": 14,
-    "late_ticks": 33,
+    "late_ticks": 1,
     "jitter": {
-      "received": 2973,
-      "played": 2965,
-      "concealed": 23,
-      "late_dropped": 9,
+      "received": 2979,
+      "played": 2971,
+      "concealed": 17,
+      "late_dropped": 3,
       "overflow_dropped": 0,
       "duplicates": 0,
-      "resets": 0
+      "resets": 0,
+      "dropouts": 17,
+      "audible_dropouts": 0
     },
     "detections": [
       [

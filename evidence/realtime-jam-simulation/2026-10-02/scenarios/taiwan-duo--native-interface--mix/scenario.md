@@ -17,10 +17,12 @@
 
 ## Mouth-to-ear latency (pipeline simulation + analytic device budget)
 
-| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected |
-| --- | --- | --- | --- | --- |
-| drums@taipei/fiber-wired → bass@kaohsiung/fiber-wired | 25.7 | 25.7 | 33.0 | 20/20 |
-| bass@kaohsiung/fiber-wired → drums@taipei/fiber-wired | 31.0 | 31.0 | 33.0 | 20/20 |
+Jitter-buffer coverage: 99.0%
+
+| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected | Concealed | Dropouts/min |
+| --- | --- | --- | --- | --- | --- | --- |
+| drums@taipei/fiber-wired → bass@kaohsiung/fiber-wired | 25.7 | 25.7 | 33.0 | 20/20 | 0.12% | 27.0 |
+| bass@kaohsiung/fiber-wired → drums@taipei/fiber-wired | 31.0 | 31.0 | 33.0 | 20/20 | 0.08% | 18.0 |
 
 ## Simulated ensemble
 

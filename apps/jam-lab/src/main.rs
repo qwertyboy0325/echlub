@@ -8,14 +8,17 @@ use std::time::Duration;
 use echlub_jam::budget::{star_path, Topology};
 use echlub_jam::jitter::recommended_depth;
 use echlub_jam::netsim::LinkProfile;
-use echlub_jam::profiles::{relay_link, EndpointProfile};
+use echlub_jam::profiles::{relay_link, Access, EndpointProfile};
 use echlub_jam::wav::encode_wav;
 use echlub_jam::{frame_ms, SAMPLE_RATE};
 use echlub_jam_lab::bots::{run_band, BandConfig, BotMode};
-use echlub_jam_lab::report::{band_markdown, budget_markdown, scenario_markdown, sweep_markdown};
+use echlub_jam_lab::report::{
+    band_markdown, budget_markdown, mobile_study_markdown, scenario_markdown, sweep_markdown,
+};
 use echlub_jam_lab::scenario::{self, parse_players, peer_setups, ScenarioConfig, PRESETS};
 use echlub_musician_sim::ensemble::sweep_uniform_latency;
 use echlub_musician_sim::synth::render_listener_mix;
+use echlub_musician_sim::Role;
 use serde::Serialize;
 
 fn usage() -> ! {
@@ -25,19 +28,23 @@ fn usage() -> ! {
 Commands:
   scenario  [--preset NAME | --players LIST] [--endpoint E] [--topology mix|forward] [--cross-isp]
             [--bpm 120] [--bars 32] [--seeds 20] [--compensation 0]
-            [--out DIR] [--wav]
+            [--coverage 0.99] [--redundancy 1] [--out DIR] [--wav]
   budget    [--preset NAME | --players LIST] [--endpoint E] [--topology mix|forward] [--cross-isp]
   sweep     [--max 80] [--step 5] [--bpm 120] [--bars 32] [--runs 30]
             [--compensation 0] [--out DIR]
   bots      [--relay HOST:PORT] [--players LIST | --count N] [--mode probe|music]
-            [--topology mix|forward] [--seconds 10] [--impair] [--bpm 120] [--relay-depth 2] [--out DIR] [--wav]
+            [--topology mix|forward] [--seconds 10] [--impair] [--coverage 0.99] [--bpm 120] [--relay-depth 2] [--out DIR] [--wav]
 
-LIST is comma-separated role@site/access, e.g. drums@taipei/fiber-wired.
+  mobile-study [--role vocals] [--seeds 10] [--out DIR]
+
+LIST is comma-separated role@site/access[/endpoint][!follow|!ahead], e.g.
+drums@taipei/fiber-wired or vocals@kaohsiung/mobile-4g/phone-app!follow.
 Roles: drums bass guitar vocals. Sites: taipei taichung tainan kaohsiung hualien.
-Access: fiber-wired cable-wired wifi mobile-5g mobile-4g.
+Access: {}
 Endpoints: {}
 Presets: {}
 All profiles are ASSUMED planning values; outputs are simulations.",
+        Access::ALL.map(|a| a.name()).join(" "),
         EndpointProfile::PRESETS.join(" "),
         presets.join(" ")
     );
@@ -103,6 +110,7 @@ fn main() {
         "budget" => cmd_budget(&args),
         "sweep" => cmd_sweep(&args),
         "bots" => cmd_bots(&args),
+        "mobile-study" => cmd_mobile_study(&args),
         _ => usage(),
     }
 }
@@ -133,6 +141,8 @@ fn scenario_config(args: &Args) -> ScenarioConfig {
         seeds: args.num("seeds", 20),
         duration_ms: 20_000.0,
         compensation: args.num("compensation", 0.0),
+        coverage: args.num("coverage", 0.99),
+        redundancy: args.num("redundancy", 1),
     }
 }
 
@@ -225,6 +235,17 @@ fn cmd_sweep(args: &Args) {
     }
 }
 
+fn cmd_mobile_study(args: &Args) {
+    let role_name = args.get("role").unwrap_or("vocals");
+    let role = Role::parse(role_name).unwrap_or_else(|| fail(&format!("unknown role {role_name}")));
+    let rows = scenario::mobile_study(role, args.num("seeds", 10), 30_000.0);
+    let md = mobile_study_markdown(&rows);
+    print!("{md}");
+    if let Some(out) = args.get("out") {
+        write_out(Path::new(out), "mobile-study", &rows, &md);
+    }
+}
+
 fn cmd_bots(args: &Args) {
     let players = match args.get("players") {
         Some(list) => parse_players(list).unwrap_or_else(|e| fail(&e)),
@@ -252,6 +273,7 @@ fn cmd_bots(args: &Args) {
     // Mix: a client buffers one stream that crossed its own downlink.
     // Forward: each source's stream crosses that source's uplink and this
     // downlink, so size each per-source buffer for the combined path.
+    let coverage: f64 = args.num("coverage", 0.99);
     let depth = |jitter: f64| recommended_depth(jitter, frame_ms()).max(2);
     let depths: Vec<Vec<usize>> = links
         .iter()
@@ -260,9 +282,9 @@ fn cmd_bots(args: &Args) {
                 .iter()
                 .map(|src| {
                     if forward {
-                        depth(src.then(own).p99_jitter_ms())
+                        depth(src.then(own).jitter_quantile_ms(coverage))
                     } else {
-                        depth(own.p99_jitter_ms())
+                        depth(own.jitter_quantile_ms(coverage))
                     }
                 })
                 .collect()

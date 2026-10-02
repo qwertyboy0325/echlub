@@ -16,18 +16,58 @@ pub struct PeerSetup {
     pub link: LinkProfile,
     pub endpoint: EndpointProfile,
     pub jitter_depth: usize,
+    /// Fraction of packets this peer's buffers are sized to catch in time
+    /// (0.99 = only the slowest 1% become dropouts).
+    pub coverage: f64,
+    /// Copies of each frame sent (1 = none, 2 = every frame sent twice).
+    pub redundancy: usize,
 }
 
 impl PeerSetup {
     /// Depth chosen to cover the link's p99 jitter.
     pub fn auto(name: impl Into<String>, link: LinkProfile, endpoint: EndpointProfile) -> Self {
-        let jitter_depth = recommended_depth(link.p99_jitter_ms(), frame_ms());
+        Self::with_coverage(name, link, endpoint, 0.99)
+    }
+
+    /// Depth chosen to cover the given fraction of the link's jitter. Lower
+    /// coverage trades dropouts for latency.
+    pub fn with_coverage(
+        name: impl Into<String>,
+        link: LinkProfile,
+        endpoint: EndpointProfile,
+        coverage: f64,
+    ) -> Self {
+        let jitter_depth = recommended_depth(link.jitter_quantile_ms(coverage), frame_ms());
         Self {
             name: name.into(),
             link,
             endpoint,
             jitter_depth,
+            coverage,
+            redundancy: 1,
         }
+    }
+
+    /// Send every frame `copies` times; buffers are resized for the
+    /// effective (best-of-copies) link.
+    pub fn with_redundancy(mut self, copies: usize) -> Self {
+        self.redundancy = copies.max(1);
+        self.jitter_depth = recommended_depth(
+            self.effective_link().jitter_quantile_ms(self.coverage),
+            frame_ms(),
+        );
+        self
+    }
+
+    /// Link as seen through redundancy: the earliest of `redundancy`
+    /// independent copies (exponential jitter mean divides by the copy
+    /// count; loss is raised to its power).
+    pub fn effective_link(&self) -> LinkProfile {
+        let r = self.redundancy.max(1);
+        let mut l = self.link.clone();
+        l.jitter_mean_ms /= r as f64;
+        l.loss = l.loss.powi(r as i32);
+        l
     }
 }
 
@@ -95,9 +135,14 @@ impl Topology {
 }
 
 /// Client jitter depth for one source in [`Topology::Forward`]: covers the
-/// combined uplink + downlink jitter.
+/// combined uplink + downlink jitter at the listener's coverage.
 pub fn forward_depth(src: &PeerSetup, dst: &PeerSetup) -> usize {
-    recommended_depth(src.link.then(&dst.link).p99_jitter_ms(), frame_ms())
+    recommended_depth(
+        src.effective_link()
+            .then(&dst.effective_link())
+            .jitter_quantile_ms(dst.coverage),
+        frame_ms(),
+    )
 }
 
 /// Expected mouth-to-ear latency from `src` to `dst` through the relay.

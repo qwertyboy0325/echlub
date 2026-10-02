@@ -61,22 +61,44 @@ impl Site {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case")]
 pub enum Access {
+    #[serde(rename = "fiber-wired")]
     FiberWired,
+    #[serde(rename = "cable-wired")]
     CableWired,
+    #[serde(rename = "wifi")]
     Wifi,
+    #[serde(rename = "mobile-5g")]
     Mobile5g,
+    /// 5G standalone core (lower and steadier radio latency than NSA).
+    #[serde(rename = "mobile-5g-sa")]
+    Mobile5gSa,
+    #[serde(rename = "mobile-4g")]
     Mobile4g,
+    /// Laptop on a phone's 4G hotspot over Wi-Fi.
+    #[serde(rename = "hotspot-4g-wifi")]
+    Hotspot4gWifi,
+    /// Laptop on a phone's 4G connection via USB tethering.
+    #[serde(rename = "hotspot-4g-usb")]
+    Hotspot4gUsb,
+    #[serde(rename = "hotspot-5g-wifi")]
+    Hotspot5gWifi,
+    #[serde(rename = "hotspot-5g-usb")]
+    Hotspot5gUsb,
 }
 
 impl Access {
-    pub const ALL: [Access; 5] = [
+    pub const ALL: [Access; 10] = [
         Access::FiberWired,
         Access::CableWired,
         Access::Wifi,
         Access::Mobile5g,
+        Access::Mobile5gSa,
         Access::Mobile4g,
+        Access::Hotspot4gWifi,
+        Access::Hotspot4gUsb,
+        Access::Hotspot5gWifi,
+        Access::Hotspot5gUsb,
     ];
 
     pub fn name(self) -> &'static str {
@@ -85,7 +107,12 @@ impl Access {
             Access::CableWired => "cable-wired",
             Access::Wifi => "wifi",
             Access::Mobile5g => "mobile-5g",
+            Access::Mobile5gSa => "mobile-5g-sa",
             Access::Mobile4g => "mobile-4g",
+            Access::Hotspot4gWifi => "hotspot-4g-wifi",
+            Access::Hotspot4gUsb => "hotspot-4g-usb",
+            Access::Hotspot5gWifi => "hotspot-5g-wifi",
+            Access::Hotspot5gUsb => "hotspot-5g-usb",
         }
     }
 
@@ -94,15 +121,31 @@ impl Access {
     }
 
     /// Assumed last-mile segment (home network + access network).
+    ///
+    /// A hotspot is the phone's cellular link plus one local hop to the
+    /// laptop. It does not improve the radio link; it lets the musician use
+    /// a computer and audio interface instead of the phone's audio stack.
     pub fn last_mile(self) -> LinkProfile {
-        let (base, jitter, loss) = match self {
-            Access::FiberWired => (1.0, 0.3, 0.000_5),
-            Access::CableWired => (4.0, 1.5, 0.001),
-            Access::Wifi => (2.0, 3.0, 0.005),
-            Access::Mobile5g => (10.0, 5.0, 0.005),
-            Access::Mobile4g => (22.0, 10.0, 0.01),
+        let cellular = |base, jitter, loss| LinkProfile::new("cellular", base, jitter, loss);
+        let lte = cellular(22.0, 10.0, 0.01);
+        let nr = cellular(10.0, 5.0, 0.005);
+        // Phone Wi-Fi access points add power-save scheduling jitter.
+        let wifi_hop = LinkProfile::new("phone-wifi-hop", 2.0, 2.5, 0.003);
+        let usb_hop = LinkProfile::new("usb-tether-hop", 0.5, 0.2, 0.0);
+        let mut link = match self {
+            Access::FiberWired => LinkProfile::new("", 1.0, 0.3, 0.000_5),
+            Access::CableWired => LinkProfile::new("", 4.0, 1.5, 0.001),
+            Access::Wifi => LinkProfile::new("", 2.0, 3.0, 0.005),
+            Access::Mobile5g => nr,
+            Access::Mobile5gSa => cellular(6.0, 2.0, 0.002),
+            Access::Mobile4g => lte,
+            Access::Hotspot4gWifi => lte.then(&wifi_hop),
+            Access::Hotspot4gUsb => lte.then(&usb_hop),
+            Access::Hotspot5gWifi => nr.then(&wifi_hop),
+            Access::Hotspot5gUsb => nr.then(&usb_hop),
         };
-        LinkProfile::new(self.name(), base, jitter, loss)
+        link.name = self.name().to_string();
+        link
     }
 }
 
@@ -136,9 +179,10 @@ pub struct EndpointProfile {
 }
 
 impl EndpointProfile {
-    pub const PRESETS: [&'static str; 4] = [
+    pub const PRESETS: [&'static str; 5] = [
         "native-interface",
         "native-builtin",
+        "phone-app",
         "browser-worklet-tuned",
         "browser-webrtc-default",
     ];
@@ -149,6 +193,9 @@ impl EndpointProfile {
             "native-interface" => (1.33, 1.33, 0.5, 0.0, 0.0, 0.0),
             // Laptop built-in audio, 256-sample buffers.
             "native-builtin" => (5.33, 5.33, 1.0, 0.0, 0.0, 0.0),
+            // Native app on a phone using its own audio stack (wired
+            // headset). Varies widely by OS and model.
+            "phone-app" => (10.0, 15.0, 1.0, 0.0, 1.0, 0.0),
             // AudioWorklet + custom datagram transport, OS-dependent buffers.
             "browser-worklet-tuned" => (10.0, 10.0, 1.0, 0.0, 1.0, 0.0),
             // Stock getUserMedia + RTCPeerConnection audio.
@@ -182,6 +229,14 @@ mod tests {
     }
 
     #[test]
+    fn access_serializes_as_cli_name() {
+        for a in Access::ALL {
+            let json = serde_json::to_string(&a).unwrap();
+            assert_eq!(json, format!("\"{}\"", a.name()));
+        }
+    }
+
+    #[test]
     fn names_round_trip() {
         for s in Site::ALL {
             assert_eq!(Site::parse(s.name()), Some(s));
@@ -189,6 +244,16 @@ mod tests {
         for a in Access::ALL {
             assert_eq!(Access::parse(a.name()), Some(a));
         }
+    }
+
+    #[test]
+    fn hotspot_adds_to_cellular_and_usb_beats_wifi() {
+        let lte = Access::Mobile4g.last_mile();
+        let usb = Access::Hotspot4gUsb.last_mile();
+        let wifi = Access::Hotspot4gWifi.last_mile();
+        assert!(usb.expected_ms() > lte.expected_ms());
+        assert!(wifi.p99_jitter_ms() > usb.p99_jitter_ms());
+        assert_eq!(usb.name, "hotspot-4g-usb");
     }
 
     #[test]

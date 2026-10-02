@@ -19,20 +19,22 @@
 
 ## Mouth-to-ear latency (pipeline simulation + analytic device budget)
 
-| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected |
-| --- | --- | --- | --- | --- |
-| drums@taipei/fiber-wired → bass@taichung/fiber-wired | 29.3 | 29.3 | 37.7 | 20/20 |
-| drums@taipei/fiber-wired → guitar@kaohsiung/fiber-wired | 37.3 | 37.3 | 42.0 | 20/20 |
-| drums@taipei/fiber-wired → vocals@tainan/mobile-4g | 109.3 | 109.3 | 114.9 | 20/20 |
-| bass@taichung/fiber-wired → drums@taipei/fiber-wired | 34.7 | 34.7 | 37.7 | 20/20 |
-| bass@taichung/fiber-wired → guitar@kaohsiung/fiber-wired | 34.7 | 34.7 | 37.5 | 20/20 |
-| bass@taichung/fiber-wired → vocals@tainan/mobile-4g | 106.7 | 106.7 | 110.4 | 20/20 |
-| guitar@kaohsiung/fiber-wired → drums@taipei/fiber-wired | 40.0 | 40.0 | 42.0 | 20/20 |
-| guitar@kaohsiung/fiber-wired → bass@taichung/fiber-wired | 32.0 | 32.0 | 37.5 | 20/20 |
-| guitar@kaohsiung/fiber-wired → vocals@tainan/mobile-4g | 112.0 | 112.0 | 114.7 | 20/20 |
-| vocals@tainan/mobile-4g → drums@taipei/fiber-wired | 117.3 | 117.3 | 114.9 | 18/19 |
-| vocals@tainan/mobile-4g → bass@taichung/fiber-wired | 109.3 | 109.3 | 110.4 | 18/19 |
-| vocals@tainan/mobile-4g → guitar@kaohsiung/fiber-wired | 117.3 | 117.3 | 114.7 | 18/19 |
+Jitter-buffer coverage: 99.0%
+
+| From → To | p50 (ms) | p95 (ms) | Analytic budget (ms) | Probes detected | Concealed | Dropouts/min |
+| --- | --- | --- | --- | --- | --- | --- |
+| drums@taipei/fiber-wired → bass@taichung/fiber-wired | 29.3 | 29.3 | 37.7 | 20/20 | 0.40% | 90.0 |
+| drums@taipei/fiber-wired → guitar@kaohsiung/fiber-wired | 37.3 | 37.3 | 42.0 | 20/20 | 0.13% | 30.0 |
+| drums@taipei/fiber-wired → vocals@tainan/mobile-4g | 109.3 | 109.3 | 114.9 | 20/20 | 1.45% | 324.0 |
+| bass@taichung/fiber-wired → drums@taipei/fiber-wired | 34.7 | 34.7 | 37.7 | 20/20 | 0.08% | 18.0 |
+| bass@taichung/fiber-wired → guitar@kaohsiung/fiber-wired | 34.7 | 34.7 | 37.5 | 20/20 | 0.08% | 18.0 |
+| bass@taichung/fiber-wired → vocals@tainan/mobile-4g | 106.7 | 106.7 | 110.4 | 20/20 | 1.39% | 312.0 |
+| guitar@kaohsiung/fiber-wired → drums@taipei/fiber-wired | 40.0 | 40.0 | 42.0 | 20/20 | 0.09% | 21.0 |
+| guitar@kaohsiung/fiber-wired → bass@taichung/fiber-wired | 32.0 | 32.0 | 37.5 | 20/20 | 0.36% | 81.0 |
+| guitar@kaohsiung/fiber-wired → vocals@tainan/mobile-4g | 112.0 | 112.0 | 114.7 | 20/20 | 1.41% | 315.0 |
+| vocals@tainan/mobile-4g → drums@taipei/fiber-wired | 117.3 | 117.3 | 114.9 | 18/19 | 1.23% | 273.0 |
+| vocals@tainan/mobile-4g → bass@taichung/fiber-wired | 109.3 | 109.3 | 110.4 | 18/19 | 1.50% | 333.0 |
+| vocals@tainan/mobile-4g → guitar@kaohsiung/fiber-wired | 117.3 | 117.3 | 114.7 | 18/19 | 1.23% | 273.0 |
 
 ## Simulated ensemble
 

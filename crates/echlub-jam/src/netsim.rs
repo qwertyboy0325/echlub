@@ -46,7 +46,13 @@ impl LinkProfile {
 
     /// 99th percentile of the exponential jitter component.
     pub fn p99_jitter_ms(&self) -> f64 {
-        self.jitter_mean_ms * 100f64.ln()
+        self.jitter_quantile_ms(0.99)
+    }
+
+    /// Jitter that a buffer must absorb so that a `coverage` fraction of
+    /// packets arrives in time (exponential tail).
+    pub fn jitter_quantile_ms(&self, coverage: f64) -> f64 {
+        -self.jitter_mean_ms * (1.0 - coverage.clamp(0.0, 0.999_999)).ln()
     }
 
     /// Two segments in series. Jitter means add (approximation).

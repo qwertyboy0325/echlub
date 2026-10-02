@@ -14,6 +14,10 @@ use serde::Serialize;
 /// Consecutive empty pops after which playout stops and re-buffers.
 const RESET_AFTER_EMPTY: u32 = 64;
 
+/// A concealment run this long (3 frames = 8 ms) is counted as audible.
+/// Shorter gaps are usually masked by concealment. Hypothesis to verify by ear.
+pub const AUDIBLE_DROPOUT_FRAMES: u32 = 3;
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub struct JitterStats {
     pub received: u64,
@@ -23,6 +27,47 @@ pub struct JitterStats {
     pub overflow_dropped: u64,
     pub duplicates: u64,
     pub resets: u64,
+    /// Number of separate concealment runs (audible dropouts), as opposed to
+    /// `concealed`, which counts frames.
+    pub dropouts: u64,
+    /// Concealment runs reaching [`AUDIBLE_DROPOUT_FRAMES`].
+    pub audible_dropouts: u64,
+}
+
+impl JitterStats {
+    pub fn merge(self, other: JitterStats) -> JitterStats {
+        JitterStats {
+            received: self.received + other.received,
+            played: self.played + other.played,
+            concealed: self.concealed + other.concealed,
+            late_dropped: self.late_dropped + other.late_dropped,
+            overflow_dropped: self.overflow_dropped + other.overflow_dropped,
+            duplicates: self.duplicates + other.duplicates,
+            resets: self.resets + other.resets,
+            dropouts: self.dropouts + other.dropouts,
+            audible_dropouts: self.audible_dropouts + other.audible_dropouts,
+        }
+    }
+
+    /// Concealed frames as a percentage of frames due for playout.
+    pub fn concealed_pct(&self) -> f64 {
+        let due = self.played + self.concealed;
+        if due == 0 {
+            0.0
+        } else {
+            self.concealed as f64 * 100.0 / due as f64
+        }
+    }
+}
+
+/// What to play when a frame is missing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Concealment {
+    Silence,
+    /// Repeat the last good frame, halving its level per missing frame.
+    /// Crude packet-loss concealment; softer than a hard gap for music.
+    RepeatFade,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,6 +87,9 @@ pub struct JitterBuffer {
     next_seq: Option<u32>,
     started: bool,
     empty_streak: u32,
+    concealment: Concealment,
+    last_frame: Vec<i16>,
+    conceal_run: u32,
     stats: JitterStats,
 }
 
@@ -56,8 +104,16 @@ impl JitterBuffer {
             next_seq: None,
             started: false,
             empty_streak: 0,
+            concealment: Concealment::Silence,
+            last_frame: vec![0; frame_len],
+            conceal_run: 0,
             stats: JitterStats::default(),
         }
+    }
+
+    pub fn with_concealment(mut self, concealment: Concealment) -> Self {
+        self.concealment = concealment;
+        self
     }
 
     pub fn target_depth(&self) -> usize {
@@ -119,10 +175,28 @@ impl JitterBuffer {
                 f.resize(self.frame_len, 0);
                 self.stats.played += 1;
                 self.empty_streak = 0;
+                self.conceal_run = 0;
+                if self.concealment == Concealment::RepeatFade {
+                    self.last_frame.clone_from(&f);
+                }
                 (PopKind::Played, f)
             }
             None => {
                 self.stats.concealed += 1;
+                if self.conceal_run == 0 {
+                    self.stats.dropouts += 1;
+                }
+                self.conceal_run += 1;
+                if self.conceal_run == AUDIBLE_DROPOUT_FRAMES {
+                    self.stats.audible_dropouts += 1;
+                }
+                let filler = match self.concealment {
+                    Concealment::Silence => vec![0; self.frame_len],
+                    Concealment::RepeatFade => {
+                        let shift = self.conceal_run.min(15);
+                        self.last_frame.iter().map(|s| s >> shift).collect()
+                    }
+                };
                 if self.frames.is_empty() {
                     self.empty_streak += 1;
                     if self.empty_streak >= RESET_AFTER_EMPTY {
@@ -131,7 +205,7 @@ impl JitterBuffer {
                         self.stats.resets += 1;
                     }
                 }
-                (PopKind::Concealed, vec![0; self.frame_len])
+                (PopKind::Concealed, filler)
             }
         }
     }
@@ -214,6 +288,21 @@ mod tests {
         assert_eq!(jb.stats().resets, 1);
         jb.push(500, frame(9));
         assert_eq!(jb.pop(), (PopKind::Played, frame(9)));
+    }
+
+    #[test]
+    fn counts_dropout_runs_and_fades() {
+        let mut jb = JitterBuffer::new(1, 4).with_concealment(Concealment::RepeatFade);
+        jb.push(0, frame(400));
+        jb.push(3, frame(400));
+        jb.pop();
+        assert_eq!(jb.pop(), (PopKind::Concealed, frame(200)));
+        assert_eq!(jb.pop(), (PopKind::Concealed, frame(100)));
+        assert_eq!(jb.pop().0, PopKind::Played);
+        jb.pop();
+        let s = jb.stats();
+        assert_eq!((s.concealed, s.dropouts, s.audible_dropouts), (3, 2, 0));
+        assert!((s.concealed_pct() - 60.0).abs() < 1e-9);
     }
 
     #[test]

@@ -83,6 +83,8 @@ def main() -> int:
         "sweep", "--max", "80", "--step", "5", "--runs", "30", "--compensation", "0.7",
         "--out", str(out / "sweep-compensation-0.7"),
     )
+    for role in ["vocals", "drums"]:
+        lab("mobile-study", "--role", role, "--seeds", "10", "--out", str(out / f"mobile-study-{role}"))
     if not args.skip_udp:
         for topology in TOPOLOGIES:
             lab(

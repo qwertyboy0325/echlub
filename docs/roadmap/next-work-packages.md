@@ -18,7 +18,10 @@ stop gate; simulations never substitute for measurement.
 ## ECHLUB-TAIWAN-NETWORK-BASELINE-01
 
 - Relay in central Taiwan; probe agents at 3–5 sites (Taipei, Taichung,
-  Tainan/Kaohsiung, Hualien) across ISPs and access types
+  Tainan/Kaohsiung, Hualien) across ISPs and access types, including 4G,
+  5G NSA, 5G SA where available, and phone hotspot over Wi-Fi vs USB
+- Measure loss burstiness (it decides whether simple packet duplication is
+  enough on cellular)
 - Replace `Assumed` profiles in `echlub-jam` with measured ones
 - Gate: p95 one-way to relay on wired fibre
 
@@ -29,6 +32,13 @@ stop gate; simulations never substitute for measurement.
 - Measure OS/browser audio buffer latency per platform (Windows, macOS,
   Android, iOS)
 - Decide the entry form from evidence; no winner before evidence
+
+## ECHLUB-JAM-MOBILE-REMEDIES-01
+
+- Redundant copies and coverage control in the real relay/bots and client
+- Synced click track with per-player advance (`FollowerClickAhead`); test
+  whether a 4G player can play to an early click while hearing the band late
+- Better packet-loss concealment than repeat-and-fade
 
 ## ECHLUB-JAM-HUMAN-TRIAL-01
 
