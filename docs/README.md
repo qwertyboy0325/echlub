@@ -6,13 +6,14 @@ Canonical documentation for the greenfield rewrite.
 
 1. `../README.md`
 2. `product/vision.md`
-3. `architecture/overview.md`
+3. `architecture/overview.md` and `architecture/realtime-jam.md`
 4. Active work package under `work-packages/`
 5. Applicable `.cursor/rules`
 6. `reference/legacy-archaeology.md` only when legacy context is needed
 
 ## Claim discipline
 
+- Real-time jam results are simulations with assumed inputs, not measurements.
 - WebRTC has not been selected as the final transport.
 - No custom transport has been demonstrated.
 - No measured latency improvement exists.

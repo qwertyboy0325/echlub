@@ -1,22 +1,43 @@
 # Next Work Packages
 
-Documented only — not implemented in foundation.
+Direction: real-time jamming across Taiwan (ADR-0006). Each package has a
+stop gate; simulations never substitute for measurement.
 
-## ECHLUB-PERFORMANCE-BASELINE-01
+## ECHLUB-REALTIME-JAM-PROTOTYPE-01
 
-- Browser audio latency decomposition
-- WebRTC media baseline
-- Local monitoring and instrumentation
-- No superiority claim
-- **Status**: implemented
+- Jam core, relay prototype, simulated musicians, UDP bots
+- **Status**: implemented (simulation + localhost only)
 
-## ECHLUB-COMPOSITION-INTENT-01
+## ECHLUB-NATIVE-AUDIO-CLIENT-01 (next)
 
-- Two-browser intent exchange
-- Ghost preview and semantic commit
-- Reconnect and convergence
+- Native client on the jam core: audio device I/O (64–128 sample buffers),
+  device-callback clock, local monitoring, `forward` and `mix` relay modes
+- Hardware loopback measurement of real mouth-to-ear latency
+- First two-player human session on LAN, then across cities
 
-## ECHLUB-TRANSPORT-BAKEOFF-01
+## ECHLUB-TAIWAN-NETWORK-BASELINE-01
 
-- WebRTC direct, WebTransport relay, WebSocket fallback
-- Predeclared metrics; no winner before evidence
+- Relay in central Taiwan; probe agents at 3–5 sites (Taipei, Taichung,
+  Tainan/Kaohsiung, Hualien) across ISPs and access types
+- Replace `Assumed` profiles in `echlub-jam` with measured ones
+- Gate: p95 one-way to relay on wired fibre
+
+## ECHLUB-BROWSER-JAM-PATH-01
+
+- "One simple step" entry: AudioWorklet + WASM jam core + WebTransport
+  datagrams vs tuned WebRTC vs native helper launched from the browser
+- Measure OS/browser audio buffer latency per platform (Windows, macOS,
+  Android, iOS)
+- Decide the entry form from evidence; no winner before evidence
+
+## ECHLUB-JAM-HUMAN-TRIAL-01
+
+- 2 → 4 players, rock; calibrate musician-sim parameters and verdict
+  thresholds against real sessions
+
+## Parked
+
+- ECHLUB-COMPOSITION-INTENT-01 (two-browser intent exchange, ghost preview):
+  not on the current critical path.
+- ECHLUB-PERFORMANCE-BASELINE-01: implemented; the WebRTC lab remains the
+  browser baseline.
