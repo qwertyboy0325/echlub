@@ -179,10 +179,15 @@ pub struct EndpointProfile {
 }
 
 impl EndpointProfile {
-    pub const PRESETS: [&'static str; 5] = [
+    pub const PRESETS: [&'static str; 10] = [
         "native-interface",
         "native-builtin",
         "phone-app",
+        "phone-ios-app",
+        "phone-android-low-latency",
+        "phone-android-generic",
+        "phone-interface",
+        "phone-browser",
         "browser-worklet-tuned",
         "browser-webrtc-default",
     ];
@@ -196,6 +201,17 @@ impl EndpointProfile {
             // Native app on a phone using its own audio stack (wired
             // headset). Varies widely by OS and model.
             "phone-app" => (10.0, 15.0, 1.0, 0.0, 1.0, 0.0),
+            // iOS app on Core Audio with small IO buffers, wired headset.
+            "phone-ios-app" => (5.33, 5.33, 1.0, 0.0, 0.5, 0.0),
+            // Android app on the AAudio/Oboe low-latency path (device must
+            // support it), wired headset.
+            "phone-android-low-latency" => (5.0, 10.0, 1.0, 0.0, 0.5, 0.0),
+            // Android app on a device without a fast audio path.
+            "phone-android-generic" => (20.0, 30.0, 1.0, 0.0, 1.0, 0.0),
+            // Phone app with a class-compliant USB audio interface.
+            "phone-interface" => (2.67, 2.67, 0.5, 0.0, 0.5, 0.0),
+            // Mobile browser with AudioWorklet + custom datagram transport.
+            "phone-browser" => (20.0, 30.0, 1.0, 0.0, 2.0, 0.0),
             // AudioWorklet + custom datagram transport, OS-dependent buffers.
             "browser-worklet-tuned" => (10.0, 10.0, 1.0, 0.0, 1.0, 0.0),
             // Stock getUserMedia + RTCPeerConnection audio.

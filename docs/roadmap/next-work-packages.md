@@ -40,10 +40,33 @@ stop gate; simulations never substitute for measurement.
   whether a 4G player can play to an early click while hearing the band late
 - Better packet-loss concealment than repeat-and-fade
 
+## ECHLUB-PHONE-TERMINAL-01
+
+- Native phone client (iOS Core Audio; Android AAudio/Oboe) on the jam core
+- On-device loopback latency measurement; detect Android low-latency
+  support; refuse or warn on Bluetooth output
+- Optional USB-C Ethernet and USB audio interface support
+- Replace the assumed `phone-*` endpoint profiles with measurements
+
+## ECHLUB-JAM-DEVICE-SELF-CHECK-01
+
+- Pre-session check: device round-trip latency, Bluetooth detection,
+  network type and jitter, suggested role
+
+## ECHLUB-JAM-SHARED-CLICK-01
+
+- Clock-synced click/backing track; per-player advance for slow links
+
 ## ECHLUB-JAM-HUMAN-TRIAL-01
 
 - 2 → 4 players, rock; calibrate musician-sim parameters and verdict
   thresholds against real sessions
+
+## Deferred by owner
+
+- ECHLUB-JAM-INTERVAL-MODE-01: NINJAM-style interval mode (others heard
+  exactly one bar/phrase late). Works on any network, including 4G and
+  browsers; revisit after the real-time path is evaluated.
 
 ## Parked
 

@@ -3,19 +3,19 @@
     "peer_id": 0,
     "frames_sent": 2996,
     "frames_dropped_uplink": 3,
-    "mixes_received": 8974,
+    "mixes_received": 8973,
     "mixes_dropped_downlink": 3,
-    "late_ticks": 2,
+    "late_ticks": 1,
     "jitter": {
-      "received": 8958,
-      "played": 8943,
-      "concealed": 23,
-      "late_dropped": 6,
+      "received": 8949,
+      "played": 8934,
+      "concealed": 32,
+      "late_dropped": 15,
       "overflow_dropped": 0,
       "duplicates": 0,
       "resets": 0,
-      "dropouts": 21,
-      "audible_dropouts": 1
+      "dropouts": 22,
+      "audible_dropouts": 2
     },
     "detections": [
       [
@@ -122,17 +122,17 @@
     "frames_dropped_uplink": 1,
     "mixes_received": 8971,
     "mixes_dropped_downlink": 4,
-    "late_ticks": 2,
+    "late_ticks": 3,
     "jitter": {
-      "received": 8957,
-      "played": 8941,
-      "concealed": 27,
-      "late_dropped": 7,
+      "received": 8947,
+      "played": 8931,
+      "concealed": 37,
+      "late_dropped": 17,
       "overflow_dropped": 0,
       "duplicates": 0,
       "resets": 0,
-      "dropouts": 24,
-      "audible_dropouts": 1
+      "dropouts": 26,
+      "audible_dropouts": 2
     },
     "detections": [
       [
@@ -237,19 +237,19 @@
     "peer_id": 2,
     "frames_sent": 2996,
     "frames_dropped_uplink": 3,
-    "mixes_received": 8976,
+    "mixes_received": 8975,
     "mixes_dropped_downlink": 12,
-    "late_ticks": 3,
+    "late_ticks": 9,
     "jitter": {
-      "received": 8953,
-      "played": 8930,
-      "concealed": 29,
-      "late_dropped": 3,
+      "received": 8946,
+      "played": 8923,
+      "concealed": 36,
+      "late_dropped": 10,
       "overflow_dropped": 0,
       "duplicates": 0,
       "resets": 0,
-      "dropouts": 29,
-      "audible_dropouts": 0
+      "dropouts": 30,
+      "audible_dropouts": 2
     },
     "detections": [
       [
@@ -354,18 +354,18 @@
     "peer_id": 3,
     "frames_sent": 2989,
     "frames_dropped_uplink": 10,
-    "mixes_received": 8983,
+    "mixes_received": 8982,
     "mixes_dropped_downlink": 41,
-    "late_ticks": 1,
+    "late_ticks": 3,
     "jitter": {
-      "received": 8926,
-      "played": 8902,
-      "concealed": 52,
-      "late_dropped": 4,
+      "received": 8923,
+      "played": 8899,
+      "concealed": 55,
+      "late_dropped": 7,
       "overflow_dropped": 0,
       "duplicates": 0,
       "resets": 0,
-      "dropouts": 52,
+      "dropouts": 54,
       "audible_dropouts": 0
     },
     "detections": [

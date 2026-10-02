@@ -42,6 +42,43 @@ def lab(*args: str) -> None:
         sys.exit(f"FAILED: {' '.join(args)}")
 
 
+def phone_terminals(out: Path) -> None:
+    """Phones as terminals: one phone in an otherwise wired band, and all-phone bands."""
+    w = "fiber-wired"
+    band = f"drums@taipei/{w},bass@taichung/{w},guitar@tainan/{w}"
+    cases = [("baseline-all-laptop-interface", f"{band},vocals@kaohsiung/{w}")]
+    for e in ["phone-interface", "phone-ios-app", "phone-android-low-latency", "phone-android-generic", "phone-browser"]:
+        for label, access in [("wired", w), ("wifi", "wifi"), ("5g-sa", "mobile-5g-sa")]:
+            cases.append((f"vocals-{e}-{label}", f"{band},vocals@kaohsiung/{access}/{e}"))
+    for e in ["phone-ios-app", "phone-android-low-latency", "phone-android-generic"]:
+        for label, access in [("wired", w), ("wifi", "wifi")]:
+            players = ",".join(
+                f"{role}@{site}/{access}/{e}"
+                for role, site in [("drums", "taipei"), ("bass", "taichung"), ("guitar", "tainan"), ("vocals", "kaohsiung")]
+            )
+            cases.append((f"all4-{e}-{label}", players))
+    root = out / "phone-terminals"
+    rows = [
+        "| Case | Players | Mouth-to-ear p50 range (ms) | Tempo drift | Playable+ | Worst audible dropouts/min |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for name, players in cases:
+        d = root / name
+        lab("scenario", "--players", players, "--topology", "forward", "--redundancy", "2",
+            "--coverage", "0.95", "--out", str(d))
+        r = json.loads((d / "scenario.json").read_text())
+        lat = [x for row in r["latency_matrix_ms"] for x in row if x > 0]
+        rows.append(
+            f"| {name} | `{players}` | {min(lat):.1f}–{max(lat):.1f} | {r['mean_tempo_drift_pct']:+.2f}% "
+            f"| {r['playable_or_better_fraction'] * 100:.0f}% | {r['worst_audible_dropouts_per_min']:.1f} |"
+        )
+    note = (
+        "> **SIMULATION.** Assumed phone audio and network profiles. `wired` for a phone means a "
+        "USB-C Ethernet adapter. Forward topology, 2 copies per frame, 95% jitter coverage.\n"
+    )
+    (root / "matrix.md").write_text("# Phones as terminals\n\n" + note + "\n" + "\n".join(rows) + "\n")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--label", default=dt.date.today().isoformat())
@@ -83,6 +120,7 @@ def main() -> int:
         "sweep", "--max", "80", "--step", "5", "--runs", "30", "--compensation", "0.7",
         "--out", str(out / "sweep-compensation-0.7"),
     )
+    phone_terminals(out)
     for role in ["vocals", "drums"]:
         lab("mobile-study", "--role", role, "--seeds", "10", "--out", str(out / f"mobile-study-{role}"))
     if not args.skip_udp:

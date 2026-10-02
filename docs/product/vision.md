@@ -12,6 +12,10 @@
   ADR-0006).
 - Work goes straight to a prototype, backed by simulated musicians so ideas
   can be exercised before real players are recruited.
+- Some experiments will use phones as terminals.
+- Current conclusions and the catalogue of network and non-network latency
+  strategies: `jam-latency-conclusions.md`. Interval (bar-delay) mode is
+  deferred.
 
 This supersedes the 2026-07-28 posture of "no accepted product thesis".
 Collaborative *composition* (shared arrangement editing) remains out of the
