@@ -1,0 +1,138 @@
+[
+  {
+    "latency_ms": 0.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": 1.0063176879881337,
+    "mean_worst_heard_rms_ms": 20.332203683309963,
+    "tight_fraction": 1.0,
+    "playable_or_better_fraction": 1.0
+  },
+  {
+    "latency_ms": 5.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": 0.8464184948132804,
+    "mean_worst_heard_rms_ms": 21.127248056169904,
+    "tight_fraction": 1.0,
+    "playable_or_better_fraction": 1.0
+  },
+  {
+    "latency_ms": 10.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": 0.6870247686782692,
+    "mean_worst_heard_rms_ms": 23.066594665085965,
+    "tight_fraction": 1.0,
+    "playable_or_better_fraction": 1.0
+  },
+  {
+    "latency_ms": 15.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": 0.5281341165397683,
+    "mean_worst_heard_rms_ms": 25.874786640468322,
+    "tight_fraction": 0.9666666666666667,
+    "playable_or_better_fraction": 1.0
+  },
+  {
+    "latency_ms": 20.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": 0.3697441604367306,
+    "mean_worst_heard_rms_ms": 29.27143859931814,
+    "tight_fraction": 0.7333333333333333,
+    "playable_or_better_fraction": 1.0
+  },
+  {
+    "latency_ms": 25.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": 0.21185253737169896,
+    "mean_worst_heard_rms_ms": 33.071402237930926,
+    "tight_fraction": 0.03333333333333333,
+    "playable_or_better_fraction": 1.0
+  },
+  {
+    "latency_ms": 30.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": 0.05445689919345554,
+    "mean_worst_heard_rms_ms": 37.144069483366735,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 1.0
+  },
+  {
+    "latency_ms": 35.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -0.1024450875196001,
+    "mean_worst_heard_rms_ms": 41.41528628632971,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.9666666666666667
+  },
+  {
+    "latency_ms": 40.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -0.25885574157437374,
+    "mean_worst_heard_rms_ms": 45.84708381965716,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.3
+  },
+  {
+    "latency_ms": 45.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -0.4147773672778456,
+    "mean_worst_heard_rms_ms": 50.41688087263068,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.0
+  },
+  {
+    "latency_ms": 50.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -0.5702122545497813,
+    "mean_worst_heard_rms_ms": 55.178118980485095,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.0
+  },
+  {
+    "latency_ms": 55.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -0.7251626790353617,
+    "mean_worst_heard_rms_ms": 60.12750924216671,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.0
+  },
+  {
+    "latency_ms": 60.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -0.8796309022153362,
+    "mean_worst_heard_rms_ms": 65.22424200170964,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.0
+  },
+  {
+    "latency_ms": 65.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -1.0336191715171592,
+    "mean_worst_heard_rms_ms": 70.48066310275905,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.0
+  },
+  {
+    "latency_ms": 70.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -1.187129720423248,
+    "mean_worst_heard_rms_ms": 75.8699344185254,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.0
+  },
+  {
+    "latency_ms": 75.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -1.3401647685790752,
+    "mean_worst_heard_rms_ms": 81.31904787666295,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.0
+  },
+  {
+    "latency_ms": 80.0,
+    "runs": 30,
+    "mean_tempo_drift_pct": -1.4927265219004748,
+    "mean_worst_heard_rms_ms": 86.8163019531194,
+    "tight_fraction": 0.0,
+    "playable_or_better_fraction": 0.0
+  }
+]

@@ -1,0 +1,15 @@
+[package]
+name = "echlub-jam-lab"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "jam-lab"
+path = "src/main.rs"
+
+[dependencies]
+echlub-jam = { workspace = true }
+echlub-jam-relay = { workspace = true }
+echlub-musician-sim = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

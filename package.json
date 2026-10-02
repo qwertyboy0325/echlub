@@ -31,6 +31,10 @@
     "live:verify": "python3 scripts/run-live-two-peer.py verify && python3 scripts/check-references.py",
     "live:validate-endpoint": "cargo run -p echlub-performance-report -- validate-live-endpoint",
     "live:pair": "cargo run -p echlub-performance-report -- pair-live-endpoints",
+    "jam:relay": "cargo run --release -p echlub-jam-relay --bin jam-relay --",
+    "jam:lab": "cargo run --release -p echlub-jam-lab --bin jam-lab --",
+    "jam:simulate": "python3 scripts/run-jam-simulation.py",
+    "jam:test": "cargo test -p echlub-jam -p echlub-musician-sim -p echlub-jam-relay -p echlub-jam-lab",
     "verify": "python3 scripts/verify.py"
   }
 }

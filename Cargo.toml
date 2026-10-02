@@ -9,9 +9,13 @@ members = [
     "crates/echlub-session",
     "crates/echlub-web",
     "crates/echlub-performance",
+    "crates/echlub-jam",
+    "crates/echlub-musician-sim",
     "apps/control-plane",
     "apps/protocol-lab",
     "apps/performance-report",
+    "apps/jam-relay",
+    "apps/jam-lab",
 ]
 
 [workspace.package]
@@ -40,3 +44,6 @@ echlub-protocol = { path = "crates/echlub-protocol" }
 echlub-replication = { path = "crates/echlub-replication" }
 echlub-session = { path = "crates/echlub-session" }
 echlub-performance = { path = "crates/echlub-performance" }
+echlub-jam = { path = "crates/echlub-jam" }
+echlub-musician-sim = { path = "crates/echlub-musician-sim" }
+echlub-jam-relay = { path = "apps/jam-relay" }

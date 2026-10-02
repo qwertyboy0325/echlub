@@ -1,0 +1,11 @@
+[package]
+name = "echlub-jam-relay"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "jam-relay"
+path = "src/main.rs"
+
+[dependencies]
+echlub-jam = { workspace = true }

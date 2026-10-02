@@ -1,0 +1,459 @@
+{
+  "evidence_level": "Simulation",
+  "disclaimer": "All network, device, and musician parameters are ASSUMED planning values. This is not a measurement and makes no latency claim about real networks.",
+  "name": "taiwan-rock-4",
+  "players": [
+    {
+      "role": "drums",
+      "site": "taipei",
+      "access": "fiber-wired"
+    },
+    {
+      "role": "bass",
+      "site": "taichung",
+      "access": "fiber-wired"
+    },
+    {
+      "role": "guitar",
+      "site": "tainan",
+      "access": "cable-wired"
+    },
+    {
+      "role": "vocals",
+      "site": "hualien",
+      "access": "wifi"
+    }
+  ],
+  "endpoint": {
+    "name": "browser-webrtc-default",
+    "capture_ms": 10.0,
+    "playback_ms": 20.0,
+    "converter_ms": 1.0,
+    "codec_extra_ms": 17.3,
+    "processing_ms": 10.0,
+    "min_jitter_ms": 40.0,
+    "provenance": "Assumed"
+  },
+  "cross_isp": false,
+  "bpm": 120.0,
+  "bars": 32,
+  "pipeline": {
+    "evidence_level": "Simulation",
+    "note": "Simulated pipeline with ASSUMED link/endpoint profiles. Not a measurement of any real network or device.",
+    "frame_ms": 2.6666666666666665,
+    "duration_ms": 20000.0,
+    "seed": 1,
+    "topology": "forward",
+    "peers": [
+      {
+        "name": "drums@taipei/fiber-wired",
+        "link": {
+          "name": "taipei/fiber-wired",
+          "base_ms": 3.5,
+          "jitter_mean_ms": 0.6,
+          "loss": 0.0004999999999999449,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "browser-webrtc-default",
+          "capture_ms": 10.0,
+          "playback_ms": 20.0,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 17.3,
+          "processing_ms": 10.0,
+          "min_jitter_ms": 40.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 3
+      },
+      {
+        "name": "bass@taichung/fiber-wired",
+        "link": {
+          "name": "taichung/fiber-wired",
+          "base_ms": 1.8,
+          "jitter_mean_ms": 0.5,
+          "loss": 0.0004999999999999449,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "browser-webrtc-default",
+          "capture_ms": 10.0,
+          "playback_ms": 20.0,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 17.3,
+          "processing_ms": 10.0,
+          "min_jitter_ms": 40.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 2
+      },
+      {
+        "name": "guitar@tainan/cable-wired",
+        "link": {
+          "name": "tainan/cable-wired",
+          "base_ms": 5.8,
+          "jitter_mean_ms": 1.8,
+          "loss": 0.0010000000000000009,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "browser-webrtc-default",
+          "capture_ms": 10.0,
+          "playback_ms": 20.0,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 17.3,
+          "processing_ms": 10.0,
+          "min_jitter_ms": 40.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 5
+      },
+      {
+        "name": "vocals@hualien/wifi",
+        "link": {
+          "name": "hualien/wifi",
+          "base_ms": 6.5,
+          "jitter_mean_ms": 3.6,
+          "loss": 0.0050000000000000044,
+          "provenance": "Assumed"
+        },
+        "endpoint": {
+          "name": "browser-webrtc-default",
+          "capture_ms": 10.0,
+          "playback_ms": 20.0,
+          "converter_ms": 1.0,
+          "codec_extra_ms": 17.3,
+          "processing_ms": 10.0,
+          "min_jitter_ms": 40.0,
+          "provenance": "Assumed"
+        },
+        "jitter_depth": 8
+      }
+    ],
+    "pairs": [
+      {
+        "from": "drums@taipei/fiber-wired",
+        "to": "bass@taichung/fiber-wired",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 16.666666666665915,
+          "p50_ms": 16.66666666666606,
+          "p95_ms": 16.66666666666663,
+          "max_ms": 16.666666666666664
+        },
+        "device_ms": 93.96666666666667,
+        "mouth_to_ear_p50_ms": 110.63333333333273,
+        "mouth_to_ear_p95_ms": 110.6333333333333,
+        "analytic_budget_ms": 112.36666666666666
+      },
+      {
+        "from": "drums@taipei/fiber-wired",
+        "to": "guitar@tainan/cable-wired",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 30.0,
+          "p50_ms": 30.0,
+          "p95_ms": 30.0,
+          "max_ms": 30.0
+        },
+        "device_ms": 85.96666666666667,
+        "mouth_to_ear_p50_ms": 115.96666666666667,
+        "mouth_to_ear_p95_ms": 115.96666666666667,
+        "analytic_budget_ms": 117.66666666666666
+      },
+      {
+        "from": "drums@taipei/fiber-wired",
+        "to": "vocals@hualien/wifi",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 40.683333333332556,
+          "p50_ms": 40.66666666666606,
+          "p95_ms": 40.666666666666664,
+          "max_ms": 40.999999999999545
+        },
+        "device_ms": 77.96666666666667,
+        "mouth_to_ear_p50_ms": 118.63333333333273,
+        "mouth_to_ear_p95_ms": 118.63333333333333,
+        "analytic_budget_ms": 120.16666666666666
+      },
+      {
+        "from": "bass@taichung/fiber-wired",
+        "to": "drums@taipei/fiber-wired",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 16.666666666665762,
+          "p50_ms": 16.66666666666606,
+          "p95_ms": 16.66666666666788,
+          "max_ms": 16.66666666666788
+        },
+        "device_ms": 91.3,
+        "mouth_to_ear_p50_ms": 107.96666666666606,
+        "mouth_to_ear_p95_ms": 107.96666666666788,
+        "analytic_budget_ms": 109.69999999999999
+      },
+      {
+        "from": "bass@taichung/fiber-wired",
+        "to": "guitar@tainan/cable-wired",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 24.666666666665762,
+          "p50_ms": 24.66666666666606,
+          "p95_ms": 24.66666666666788,
+          "max_ms": 24.66666666666788
+        },
+        "device_ms": 85.96666666666667,
+        "mouth_to_ear_p50_ms": 110.63333333333273,
+        "mouth_to_ear_p95_ms": 110.63333333333455,
+        "analytic_budget_ms": 113.19999999999999
+      },
+      {
+        "from": "bass@taichung/fiber-wired",
+        "to": "vocals@hualien/wifi",
+        "expected_probes": 20,
+        "detected_probes": 19,
+        "network_path": {
+          "count": 19,
+          "mean_ms": 35.333333333333265,
+          "p50_ms": 35.33333333333303,
+          "p95_ms": 35.33333333333576,
+          "max_ms": 35.33333333333576
+        },
+        "device_ms": 77.96666666666667,
+        "mouth_to_ear_p50_ms": 113.2999999999997,
+        "mouth_to_ear_p95_ms": 113.30000000000243,
+        "analytic_budget_ms": 118.36666666666666
+      },
+      {
+        "from": "guitar@tainan/cable-wired",
+        "to": "drums@taipei/fiber-wired",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 27.333333333332508,
+          "p50_ms": 27.33333333333212,
+          "p95_ms": 27.333333333333258,
+          "max_ms": 27.333333333333258
+        },
+        "device_ms": 91.3,
+        "mouth_to_ear_p50_ms": 118.63333333333212,
+        "mouth_to_ear_p95_ms": 118.63333333333325,
+        "analytic_budget_ms": 122.99999999999999
+      },
+      {
+        "from": "guitar@tainan/cable-wired",
+        "to": "bass@taichung/fiber-wired",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 24.666666666666714,
+          "p50_ms": 24.66666666666663,
+          "p95_ms": 24.66666666666788,
+          "max_ms": 24.66666666666788
+        },
+        "device_ms": 93.96666666666667,
+        "mouth_to_ear_p50_ms": 118.6333333333333,
+        "mouth_to_ear_p95_ms": 118.63333333333455,
+        "analytic_budget_ms": 121.19999999999999
+      },
+      {
+        "from": "guitar@tainan/cable-wired",
+        "to": "vocals@hualien/wifi",
+        "expected_probes": 20,
+        "detected_probes": 20,
+        "network_path": {
+          "count": 20,
+          "mean_ms": 48.666666666666714,
+          "p50_ms": 48.66666666666663,
+          "p95_ms": 48.66666666666788,
+          "max_ms": 48.66666666666788
+        },
+        "device_ms": 77.96666666666667,
+        "mouth_to_ear_p50_ms": 126.6333333333333,
+        "mouth_to_ear_p95_ms": 126.63333333333455,
+        "analytic_budget_ms": 129.0
+      },
+      {
+        "from": "vocals@hualien/wifi",
+        "to": "drums@taipei/fiber-wired",
+        "expected_probes": 19,
+        "detected_probes": 19,
+        "network_path": {
+          "count": 19,
+          "mean_ms": 43.333333333332526,
+          "p50_ms": 43.33333333333212,
+          "p95_ms": 43.33333333333326,
+          "max_ms": 43.33333333333326
+        },
+        "device_ms": 91.3,
+        "mouth_to_ear_p50_ms": 134.63333333333213,
+        "mouth_to_ear_p95_ms": 134.63333333333327,
+        "analytic_budget_ms": 133.5
+      },
+      {
+        "from": "vocals@hualien/wifi",
+        "to": "bass@taichung/fiber-wired",
+        "expected_probes": 19,
+        "detected_probes": 19,
+        "network_path": {
+          "count": 19,
+          "mean_ms": 43.333333333332526,
+          "p50_ms": 43.33333333333212,
+          "p95_ms": 43.33333333333326,
+          "max_ms": 43.33333333333326
+        },
+        "device_ms": 93.96666666666667,
+        "mouth_to_ear_p50_ms": 137.2999999999988,
+        "mouth_to_ear_p95_ms": 137.29999999999993,
+        "analytic_budget_ms": 134.36666666666667
+      },
+      {
+        "from": "vocals@hualien/wifi",
+        "to": "guitar@tainan/cable-wired",
+        "expected_probes": 19,
+        "detected_probes": 19,
+        "network_path": {
+          "count": 19,
+          "mean_ms": 51.333333333332526,
+          "p50_ms": 51.33333333333212,
+          "p95_ms": 51.33333333333326,
+          "max_ms": 51.33333333333326
+        },
+        "device_ms": 85.96666666666667,
+        "mouth_to_ear_p50_ms": 137.2999999999988,
+        "mouth_to_ear_p95_ms": 137.29999999999993,
+        "analytic_budget_ms": 137.0
+      }
+    ],
+    "relay_jitter": [],
+    "client_jitter": [
+      {
+        "received": 22414,
+        "played": 22399,
+        "concealed": 69,
+        "late_dropped": 7,
+        "overflow_dropped": 0,
+        "duplicates": 0,
+        "resets": 0
+      },
+      {
+        "received": 22414,
+        "played": 22400,
+        "concealed": 69,
+        "late_dropped": 5,
+        "overflow_dropped": 0,
+        "duplicates": 0,
+        "resets": 0
+      },
+      {
+        "received": 22410,
+        "played": 22391,
+        "concealed": 70,
+        "late_dropped": 5,
+        "overflow_dropped": 0,
+        "duplicates": 0,
+        "resets": 0
+      },
+      {
+        "received": 22342,
+        "played": 22317,
+        "concealed": 137,
+        "late_dropped": 13,
+        "overflow_dropped": 0,
+        "duplicates": 0,
+        "resets": 0
+      }
+    ]
+  },
+  "latency_matrix_ms": [
+    [
+      0.0,
+      110.63333333333273,
+      115.96666666666667,
+      118.63333333333273
+    ],
+    [
+      107.96666666666606,
+      0.0,
+      110.63333333333273,
+      113.2999999999997
+    ],
+    [
+      118.63333333333212,
+      118.6333333333333,
+      0.0,
+      126.6333333333333
+    ],
+    [
+      134.63333333333213,
+      137.2999999999988,
+      137.2999999999988,
+      0.0
+    ]
+  ],
+  "ensemble_runs": 20,
+  "tight_fraction": 0.0,
+  "playable_or_better_fraction": 0.0,
+  "mean_tempo_drift_pct": -10.200428878100917,
+  "mean_worst_heard_rms_ms": 170.286455468993,
+  "thresholds": {
+    "tight_drift_pct": 2.0,
+    "tight_heard_rms_ms": 30.0,
+    "playable_drift_pct": 5.0,
+    "playable_heard_rms_ms": 45.0
+  },
+  "example_run": {
+    "evidence_level": "Simulation",
+    "target_bpm": 120.0,
+    "start_bpm": 111.2310802541292,
+    "end_bpm": 107.53042576741308,
+    "tempo_drift_pct": -10.3913118604891,
+    "worst_heard_rms_ms": 169.7068995208284,
+    "onset_spread_sd_ms": 24.450534190197054,
+    "causality_warning": false,
+    "verdict": "Struggling",
+    "thresholds": {
+      "tight_drift_pct": 2.0,
+      "tight_heard_rms_ms": 30.0,
+      "playable_drift_pct": 5.0,
+      "playable_heard_rms_ms": 45.0
+    },
+    "players": [
+      {
+        "name": "drums@taipei/fiber-wired",
+        "role": "drums",
+        "heard_rms_async_ms": 169.7068995208284,
+        "heard_mean_async_ms": 168.76854018193453
+      },
+      {
+        "name": "bass@taichung/fiber-wired",
+        "role": "bass",
+        "heard_rms_async_ms": 103.02919913694107,
+        "heard_mean_async_ms": 97.22757844615018
+      },
+      {
+        "name": "guitar@tainan/cable-wired",
+        "role": "guitar",
+        "heard_rms_async_ms": 103.75723829843477,
+        "heard_mean_async_ms": 99.05681797059586
+      },
+      {
+        "name": "vocals@hualien/wifi",
+        "role": "vocals",
+        "heard_rms_async_ms": 123.08146773598047,
+        "heard_mean_async_ms": 118.36928562353714
+      }
+    ]
+  }
+}

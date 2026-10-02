@@ -1,0 +1,8 @@
+[package]
+name = "echlub-musician-sim"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+echlub-jam = { workspace = true }
+serde = { workspace = true }
