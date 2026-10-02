@@ -16,12 +16,18 @@ monitoring. Not started; requires the iOS client
 | Transport defaults | 2 copies per frame, jitter coverage 95% |
 | Music | Rock, 4/4, 120 BPM, I–V–vi–IV riff plus a song with shared stops |
 
-Hardware per player: iPhone, USB-C hub with Ethernet (and USB-A for an
-instrument interface), wired headphones / USB-C headphone adapter.
+Hardware per player: iPhone, wired headphones (USB-C or adapter). Ethernet
+adapter only for the reference runs. Guitar/bass need a USB-C instrument
+interface (which can also drive the headphones).
+
+User-facing network condition (ADR-0007 amendment): tuned Wi-Fi — 5 GHz
+Wi-Fi 6 near the router, voice-priority marking, AirDrop/Handoff off,
+Low Power Mode off, 128-frame buffer.
 
 ## Variables, in order
 
-1. **Network:** Ethernet adapter → one player on Wi-Fi → all Wi-Fi → 5G SA.
+1. **Network:** Ethernet adapter (reference) → tuned Wi-Fi (target) →
+   typical home Wi-Fi → 5G SA.
 2. **IO buffer:** 256 → 128 frames.
 3. **Band size:** 2 → 3 → 4 players.
 4. **Distance:** same city → north–south.
@@ -50,7 +56,9 @@ From `evidence/realtime-jam-simulation/2026-10-02/iphone-target/`:
 | 4-piece, 3 Ethernet + vocals on Wi-Fi | ~25–35 | playable |
 | 4-piece, 3 Ethernet + drums on Wi-Fi | ~25–35 | borderline |
 | 4-piece, 2 on Wi-Fi | ~25–43 | not playable |
-| 4-piece, all Wi-Fi | ~35–43 | not playable |
+| 4-piece, all tuned Wi-Fi, 128 | ~25–27 | playable (**target**) |
+| 4-piece, all tuned Wi-Fi, 256 | ~30–33 | playable |
+| 4-piece, all typical Wi-Fi, 256 | ~35–43 | not playable |
 | 4-piece, all 5G SA | ~41–46 | not playable |
 | 4-piece, Ethernet, Bluetooth monitoring | ~170 | not playable |
 

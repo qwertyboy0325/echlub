@@ -34,3 +34,24 @@ through wired headphones.**
   one hub can carry Ethernet, headphones, and an instrument interface.
 - The `phone-ios-*` endpoint profiles are assumptions until replaced by
   on-device loopback measurement.
+
+## Amendment 2026-10-02: no network cable on the phone
+
+A network cable on the phone is expected to hurt willingness to use. The
+user-facing default is therefore **wireless networking with wired
+headphones only**:
+
+- Wi-Fi 6 on 5 GHz near the router, audio packets marked voice priority
+  (`NWParameters.serviceClass = .interactiveVoice` → WMM voice / DSCP EF),
+  AirDrop/Handoff off (avoids AWDL channel-hop latency spikes), Low Power
+  Mode off.
+- 128-frame IO buffer, 2 copies per frame.
+
+Simulation (assumed "tuned Wi-Fi" profile) puts an all-iPhone 4-piece at
+~25–27 ms, matching Ethernet with a 256-frame buffer, and playable. Typical
+untuned home Wi-Fi stays borderline (~30–35 ms even with 3 copies).
+
+The USB-C Ethernet adapter remains the **reference condition** in
+experiments (to separate network from device effects) and a fallback, not
+the default. Wired headphones remain required; no wireless monitoring on
+iPhone is known to be low-latency enough.

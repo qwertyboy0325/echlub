@@ -68,6 +68,10 @@ pub enum Access {
     CableWired,
     #[serde(rename = "wifi")]
     Wifi,
+    /// Wi-Fi 6 on 5 GHz near the router, voice-priority (WMM/DSCP EF)
+    /// marking, AirDrop/Handoff off (no AWDL channel hopping).
+    #[serde(rename = "wifi-tuned")]
+    WifiTuned,
     #[serde(rename = "mobile-5g")]
     Mobile5g,
     /// 5G standalone core (lower and steadier radio latency than NSA).
@@ -88,10 +92,11 @@ pub enum Access {
 }
 
 impl Access {
-    pub const ALL: [Access; 10] = [
+    pub const ALL: [Access; 11] = [
         Access::FiberWired,
         Access::CableWired,
         Access::Wifi,
+        Access::WifiTuned,
         Access::Mobile5g,
         Access::Mobile5gSa,
         Access::Mobile4g,
@@ -106,6 +111,7 @@ impl Access {
             Access::FiberWired => "fiber-wired",
             Access::CableWired => "cable-wired",
             Access::Wifi => "wifi",
+            Access::WifiTuned => "wifi-tuned",
             Access::Mobile5g => "mobile-5g",
             Access::Mobile5gSa => "mobile-5g-sa",
             Access::Mobile4g => "mobile-4g",
@@ -136,6 +142,7 @@ impl Access {
             Access::FiberWired => LinkProfile::new("", 1.0, 0.3, 0.000_5),
             Access::CableWired => LinkProfile::new("", 4.0, 1.5, 0.001),
             Access::Wifi => LinkProfile::new("", 2.0, 3.0, 0.005),
+            Access::WifiTuned => LinkProfile::new("", 1.5, 0.8, 0.002),
             Access::Mobile5g => nr,
             Access::Mobile5gSa => cellular(6.0, 2.0, 0.002),
             Access::Mobile4g => lte,
@@ -278,6 +285,15 @@ mod tests {
         assert!(usb.expected_ms() > lte.expected_ms());
         assert!(wifi.p99_jitter_ms() > usb.p99_jitter_ms());
         assert_eq!(usb.name, "hotspot-4g-usb");
+    }
+
+    #[test]
+    fn tuned_wifi_sits_between_wired_and_typical_wifi() {
+        let wired = relay_link(Site::Taipei, Access::FiberWired, false);
+        let tuned = relay_link(Site::Taipei, Access::WifiTuned, false);
+        let typical = relay_link(Site::Taipei, Access::Wifi, false);
+        assert!(wired.p99_jitter_ms() < tuned.p99_jitter_ms());
+        assert!(tuned.p99_jitter_ms() < typical.p99_jitter_ms());
     }
 
     #[test]

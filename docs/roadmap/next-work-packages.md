@@ -58,6 +58,9 @@ stop gate; simulations never substitute for measurement.
 
 - Pre-session check: device round-trip latency, Bluetooth detection,
   network type and jitter, suggested role
+- Wi-Fi coaching (no cable on the phone): 5 GHz/band and signal check,
+  measured jitter to the relay, prompts to disable AirDrop/Handoff and Low
+  Power Mode; voice-priority packet marking in the client
 
 ## ECHLUB-JAM-SHARED-CLICK-01
 

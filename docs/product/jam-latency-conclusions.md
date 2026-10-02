@@ -39,6 +39,7 @@ only; **deferred** = owner postponed.
 | Audio interface / low-latency phone audio path, small buffers | sim | `native-interface`, `phone-ios-app`, `phone-android-low-latency`, `phone-interface` |
 | Disable OS voice processing (noise suppression, AGC) | doc | Each stage adds latency |
 | Pre-session device self-check | doc | Measure device latency, flag Bluetooth/Wi-Fi before joining |
+| Wi-Fi coaching instead of a cable | sim | 5 GHz near router, voice-priority marking, AirDrop/Handoff off; ~equal to Ethernet when combined with a 128-frame buffer |
 
 ### B. How the band plays
 
@@ -81,7 +82,9 @@ only; **deferred** = owner postponed.
 | Ethernet adapter, 128-frame buffer | ~19–22 | yes, partly tight |
 | 3 Ethernet + vocals on Wi-Fi or 5G SA | ~25–35 | yes |
 | 3 Ethernet + drums on Wi-Fi | ~25–35 | borderline |
-| All Wi-Fi | ~35–43 | no |
+| All tuned Wi-Fi, 128-frame buffer (**user-facing target**) | ~25–27 | yes |
+| All tuned Wi-Fi, 256-frame buffer | ~30–33 | yes |
+| All typical home Wi-Fi | ~35–43 | no |
 | All 5G SA / 5G / 4G | ~41–46 / ~59–70 / ~97–113 | no |
 | Ethernet, Bluetooth monitoring | ~170 | no |
 
